@@ -1,5 +1,21 @@
 <div>
-    Stacked bar chart showing test pass / fail / skip counts over time.
-    Requires a test publisher (JUnit, etc.) to be configured on this job
-    so that test results are recorded with each build.
+    <p>
+        Stacked bar chart showing the regression-health anomaly summary per build:
+        the number of failures classified as anomalies vs. those flagged as
+        related to known issues, plus the unclassified remainder.
+    </p>
+    <p>
+        <b>Prerequisites:</b>
+    </p>
+    <ul>
+        <li>A valid <b>Verisium AI</b> license must be available on the vManager
+            server.</li>
+        <li><b>Regression Health</b> must be configured and enabled in vManager
+            for the project / regressions whose sessions this job runs, so that
+            anomaly classifications are produced for each session.</li>
+    </ul>
+    <p>
+        Without these in place the chart will be empty (or show only the
+        unclassified bucket) because vManager has no anomaly data to return.
+    </p>
 </div>

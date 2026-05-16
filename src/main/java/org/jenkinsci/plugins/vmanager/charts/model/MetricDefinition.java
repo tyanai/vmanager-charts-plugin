@@ -289,12 +289,12 @@ public class MetricDefinition extends AbstractDescribableImpl<MetricDefinition> 
             try {
                 StandardUsernamePasswordCredentials creds =
                         lookupCredentials(item, credentialsId, serverUrl);
-                LOGGER.log(Level.INFO, "Fetching vManager attributes: GET {0} (creds={1})",
+                LOGGER.log(Level.FINE, "Fetching vManager attributes: GET {0} (creds={1})",
                         new Object[]{url, creds == null ? "<none>" : creds.getId()});
                 String body = fetchUrl(url, creds);
                 List<AttributeInfo> attrs = parseAttributes(body);
                 attrs.sort((a, b) -> a.title.compareToIgnoreCase(b.title));
-                LOGGER.log(Level.INFO, "vManager attributes: parsed {0} numeric attribute(s) from {1}",
+                LOGGER.log(Level.FINE, "vManager attributes: parsed {0} numeric attribute(s) from {1}",
                         new Object[]{attrs.size(), url});
                 for (AttributeInfo attr : attrs) {
                     m.add(attr.title + " (" + attr.id + ")");

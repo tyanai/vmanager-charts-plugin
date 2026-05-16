@@ -43,7 +43,7 @@
         </f:entry>
         <f:entry title="Attribute *"
                  field="attributeName"
-                 description="Required. Pick an attribute fetched from the vManager server. Type any part of the name to filter (case-insensitive). You can also type manually.">
+                 description="Required. Pick an attribute fetched from the vManager server. Type any part of the name to filter.">
             <f:combobox fillDependsOn="entityType ../../serverUrl ../../credentialsId"
                         checkDependsOn="entityType ../../serverUrl ../../credentialsId"/>
         </f:entry>
@@ -75,7 +75,7 @@
     <div class="vmp-entity-cond" data-vmp-entity="COVERAGE_LEVEL">
         <f:entry title="Verification Scope"
                  field="verificationScope"
-                 description="Optional. Scope filter for the metrics query.">
+                 description="Optional. Verification Scope filter for the metrics query.">
             <f:textbox/>
         </f:entry>
         <f:entry title="Hierarchy"

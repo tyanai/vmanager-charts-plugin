@@ -52,7 +52,7 @@
         </f:entry>
         <f:entry title="vPlan Type"
                  field="vPlanType"
-                 description="Optional. Leave as None to query all data, or filter by a specific vPlan.">
+                 description="Optional. Leave as None if you don't plan to use vPlan in this chart, or filter by a specific vPlan.">
             <f:select/>
         </f:entry>
         <f:entry title="vPlan"

@@ -12,7 +12,9 @@ import hudson.model.TaskListener;
 import hudson.model.listeners.RunListener;
 import hudson.security.ACL;
 import org.jenkinsci.plugins.vmanager.charts.model.ChartDefinition;
+import org.jenkinsci.plugins.vmanager.charts.util.BuildLog;
 import org.jenkinsci.plugins.vmanager.charts.util.CoverageRoutingContext;
+import org.jenkinsci.plugins.vmanager.charts.util.JsonConfigLoader;
 import org.jenkinsci.plugins.vmanager.charts.util.VManagerChartsUtil;
 import org.jenkinsci.plugins.vmanager.charts.util.VManagerRunsClient;
 import org.jenkinsci.plugins.vmanager.charts.util.VManagerSessionsClient;
@@ -49,6 +51,49 @@ public class CustomMetricsRunListener extends RunListener<Run<?, ?>> {
             return;
         }
 
+        // Gate all chatty [vManager Charts] build-console lines behind the
+        // job's "Verbose logging" flag for the duration of this build.
+        BuildLog.setVerbose(property.isVerboseLogging());
+        try {
+            doOnCompleted(run, job, property, listener);
+        } finally {
+            BuildLog.clear();
+        }
+    }
+
+    private void doOnCompleted(Run<?, ?> run, Job<?, ?> job,
+                               VManagerChartsJobProperty property,
+                               TaskListener listener) {
+
+        // ── Optional: replace the property with values loaded from a JSON
+        //    file in the workspace. credentialsId is always taken from the
+        //    GUI-saved property and re-applied to the loaded one. ──
+        if ("FILE".equalsIgnoreCase(property.getConfigSource())) {
+            VManagerChartsJobProperty loaded = loadConfigFromWorkspace(run, property, listener);
+            if (loaded == null) {
+                // Reason already logged by the loader; abort the post-build work.
+                return;
+            }
+            // Server URL, credentials and vManager Session always come from
+            // the GUI — overlay them on top of the JSON-loaded chart config.
+            loaded.setCredentialsId(property.getCredentialsId());
+            loaded.setServerUrl(property.getServerUrl());
+            loaded.setSessionSource(property.getSessionSource());
+            loaded.setSessionInputFile(property.getSessionInputFile());
+            // Also overlay the verbose-logging flag from the GUI — the JSON
+            // file is intentionally about chart definitions, not log levels.
+            loaded.setVerboseLogging(property.isVerboseLogging());
+            property = loaded;
+            if (!property.isEnabled()) {
+                listener.getLogger().println(
+                        "[vManager Charts] JSON config has enabled=false. Skipping.");
+                return;
+            }
+        } else {
+            BuildLog.trace(listener,
+                    "[vManager Charts] Configuration source: GUI (job configuration page).");
+        }
+
         String serverUrl = property.getServerUrl();
         if (serverUrl == null || serverUrl.isBlank()) {
             listener.getLogger().println(
@@ -81,12 +126,12 @@ public class CustomMetricsRunListener extends RunListener<Run<?, ?>> {
             sessions = java.util.Collections.emptyList();
         }
         if (sessionsFile != null) {
-            listener.getLogger().println("[vManager Charts] sessions input file: "
+            BuildLog.trace(listener, "[vManager Charts] sessions input file: "
                     + sessionsFile.getRemote()
                     + " (" + sessions.size() + " session" + (sessions.size() == 1 ? "" : "s") + ")");
         }
         for (String s : sessions) {
-            listener.getLogger().println("[vManager Charts]   session: " + s);
+            BuildLog.trace(listener, "[vManager Charts]   session: " + s);
         }
 
         // ── Per-build session run-state aggregates (used by Success/Failure chart) ──
@@ -99,10 +144,10 @@ public class CustomMetricsRunListener extends RunListener<Run<?, ?>> {
                         agg.passedRuns, agg.failedRuns, agg.running,
                         agg.waiting, agg.otherRuns, sessions.size()));
                 savedAction = true;
-                listener.getLogger().printf(
-                        "[vManager Charts] session run state: passed=%d failed=%d running=%d waiting=%d other=%d (rows=%d)%n",
+                BuildLog.trace(listener, String.format(
+                        "[vManager Charts] session run state: passed=%d failed=%d running=%d waiting=%d other=%d (rows=%d)",
                         agg.passedRuns, agg.failedRuns, agg.running, agg.waiting,
-                        agg.otherRuns, agg.rowCount);
+                        agg.otherRuns, agg.rowCount));
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, "Failed to fetch session aggregates from vManager", e);
                 listener.getLogger().println(
@@ -121,26 +166,38 @@ public class CustomMetricsRunListener extends RunListener<Run<?, ?>> {
                         VManagerRunsClient.fetchRunPoints(
                                 serverUrl, sessions, sessionStartMs, creds, listener);
                 int n = points.size();
-                List<double[]> small  = new java.util.ArrayList<>();
-                List<double[]> medium = new java.util.ArrayList<>();
-                List<double[]> large  = new java.util.ArrayList<>();
+                List<double[]> small     = new java.util.ArrayList<>();
+                List<double[]> medium    = new java.util.ArrayList<>();
+                List<double[]> large     = new java.util.ArrayList<>();
+                List<double[]> smallEnd  = new java.util.ArrayList<>();
+                List<double[]> mediumEnd = new java.util.ArrayList<>();
+                List<double[]> largeEnd  = new java.util.ArrayList<>();
                 if (n > 0) {
-                    int third     = n / 3;
-                    int smallEnd  = third;
-                    int mediumEnd = third + third;
+                    int third       = n / 3;
+                    int smallBound  = third;
+                    int mediumBound = third + third;
                     for (int i = 0; i < n; i++) {
                         VManagerRunsClient.RunPoint pt = points.get(i);
-                        double[] xy = new double[]{ pt.timeToEndMinutes, pt.durationMinutes };
-                        if (i < smallEnd)        small.add(xy);
-                        else if (i < mediumEnd)  medium.add(xy);
-                        else                     large.add(xy);
+                        double[] xyStart = new double[]{ pt.timeToStartMinutes, pt.durationMinutes };
+                        double[] xyEnd   = new double[]{ pt.timeToEndMinutes,   pt.durationMinutes };
+                        if (i < smallBound) {
+                            small.add(xyStart);
+                            smallEnd.add(xyEnd);
+                        } else if (i < mediumBound) {
+                            medium.add(xyStart);
+                            mediumEnd.add(xyEnd);
+                        } else {
+                            large.add(xyStart);
+                            largeEnd.add(xyEnd);
+                        }
                     }
                 }
-                run.addAction(new RegressionOptimizationBuildAction(small, medium, large));
+                run.addAction(new RegressionOptimizationBuildAction(
+                        small, medium, large, smallEnd, mediumEnd, largeEnd));
                 savedAction = true;
-                listener.getLogger().printf(
-                        "[vManager Charts] regression optimization: rows=%d small=%d medium=%d large=%d%n",
-                        n, small.size(), medium.size(), large.size());
+                BuildLog.trace(listener, String.format(
+                        "[vManager Charts] runs duration: rows=%d small=%d medium=%d large=%d",
+                        n, small.size(), medium.size(), large.size()));
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, "Failed to fetch regression-optimization data from vManager", e);
                 listener.getLogger().println(
@@ -193,5 +250,59 @@ public class CustomMetricsRunListener extends RunListener<Run<?, ?>> {
         return CredentialsMatchers.firstOrNull(
                 candidates,
                 CredentialsMatchers.withId(credentialsId));
+    }
+
+    /**
+     * Resolves and reads the JSON config file from the build's workspace,
+     * returning a fully-populated property. Returns {@code null} (and logs
+     * the reason to the build log) if the file is missing or unparseable.
+     */
+    private VManagerChartsJobProperty loadConfigFromWorkspace(
+            Run<?, ?> run, VManagerChartsJobProperty guiProperty, TaskListener listener) {
+
+        FilePath workspace = VManagerChartsUtil.getCurrentWorkspace(run);
+        if (workspace == null) {
+            listener.getLogger().println(
+                    "[vManager Charts] WARNING: configSource=FILE but no workspace is available for this build. Skipping.");
+            return null;
+        }
+
+        String requested = guiProperty.getConfigFilePath();
+        FilePath cfg;
+        if (requested == null || requested.isBlank()) {
+            cfg = workspace.child("vmanager-charts.config.json");
+        } else {
+            // Allow either workspace-relative or absolute paths.
+            FilePath asAbs = new FilePath(workspace.getChannel(), requested);
+            FilePath asRel = workspace.child(requested);
+            try {
+                cfg = asAbs.exists() ? asAbs : asRel;
+            } catch (IOException | InterruptedException e) {
+                cfg = asRel;
+            }
+        }
+
+        try {
+            if (!cfg.exists()) {
+                listener.getLogger().println(
+                        "[vManager Charts] WARNING: configSource=FILE but JSON config file not found: "
+                                + cfg.getRemote() + ". Skipping.");
+                return null;
+            }
+            String json = cfg.readToString();
+            BuildLog.trace(listener,
+                    "[vManager Charts] Configuration source: JSON file from workspace ("
+                            + cfg.getRemote() + "). Credentials still taken from GUI.");
+            return JsonConfigLoader.load(json);
+        } catch (IOException | InterruptedException | RuntimeException e) {
+            LOGGER.log(Level.WARNING, "Failed to load JSON config from workspace", e);
+            listener.getLogger().println(
+                    "[vManager Charts] WARNING: failed to load JSON config "
+                            + cfg.getRemote() + ": " + e.getMessage() + ". Skipping.");
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            return null;
+        }
     }
 }

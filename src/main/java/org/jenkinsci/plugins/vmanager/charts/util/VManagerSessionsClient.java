@@ -254,7 +254,7 @@ public final class VManagerSessionsClient {
     /** Logs the outgoing POST URL, headers, and payload to the build console. */
     private static void logPost(TaskListener listener, String url, String payload,
                                 StandardUsernamePasswordCredentials creds) {
-        if (listener == null) return;
+        if (listener == null || !BuildLog.isVerbose()) return;
         listener.getLogger().println("[vManager Charts] POST " + url);
         listener.getLogger().println("[vManager Charts]   request headers:");
         listener.getLogger().println("[vManager Charts]     Content-Type: application/json; charset=UTF-8");

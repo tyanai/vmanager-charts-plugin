@@ -16,13 +16,13 @@ import java.util.logging.Logger;
 
 /**
  * Thin client around the vManager {@code /rest/runs/list} endpoint used to
- * fetch the {@code (end_time, duration)} pair of every run that belongs to a
+ * fetch the {@code (start_time, duration)} pair of every run that belongs to a
  * given set of sessions.
  *
  * <p>The payload uses a {@code .ChainedFilter} (OR) of one
  * {@code .RelationFilter} per session name, asks the server to sort by
  * {@code duration ASCENDING} and projects only the two columns we need
- * ({@code duration}, {@code end_time}).</p>
+ * ({@code duration}, {@code start_time}).</p>
  *
  * <p>For internal vManager servers with self-signed certs the underlying
  * {@link VManagerHttpClient} trusts all certs/hostnames.</p>
@@ -32,16 +32,18 @@ public final class VManagerRunsClient {
     private static final Logger LOGGER = Logger.getLogger(VManagerRunsClient.class.getName());
 
     /**
-     * Single run point: {@code [timeToEndMinutes, durationMinutes]}, where
-     * {@code timeToEndMinutes} is the elapsed minutes between the session's
-     * start time and the run's end time.
+     * Single run point: holds both {@code timeToStartMinutes} and
+     * {@code timeToEndMinutes} (elapsed minutes from the session's start to
+     * the run's start / end respectively) and the run {@code durationMinutes}.
      */
     public static final class RunPoint {
+        public final double timeToStartMinutes;
         public final double timeToEndMinutes;
         public final double durationMinutes;
-        RunPoint(double timeToEndMinutes, double durationMinutes) {
-            this.timeToEndMinutes = timeToEndMinutes;
-            this.durationMinutes  = durationMinutes;
+        RunPoint(double timeToStartMinutes, double timeToEndMinutes, double durationMinutes) {
+            this.timeToStartMinutes = timeToStartMinutes;
+            this.timeToEndMinutes   = timeToEndMinutes;
+            this.durationMinutes    = durationMinutes;
         }
     }
 
@@ -114,8 +116,8 @@ public final class VManagerRunsClient {
                 + "\n  headers: Content-Type=application/json; charset=UTF-8, "
                 + "Accept=application/json, Authorization=Basic <redacted>"
                 + "\n  payload: " + payload;
-        if (listener != null) listener.getLogger().println(debug);
-        LOGGER.log(Level.INFO, debug);
+        if (listener != null && BuildLog.isVerbose()) listener.getLogger().println(debug);
+        LOGGER.log(Level.FINE, debug);
 
         String responseBody = VManagerHttpClient.postJson(url, payload, creds);
 
@@ -130,8 +132,8 @@ public final class VManagerRunsClient {
 
         String summary = "[vManager Charts] session start_time = " + startMs + " ms (from "
                 + rows.size() + " session row" + (rows.size() == 1 ? "" : "s") + ")";
-        if (listener != null) listener.getLogger().println(summary);
-        LOGGER.log(Level.INFO, summary);
+        if (listener != null && BuildLog.isVerbose()) listener.getLogger().println(summary);
+        LOGGER.log(Level.FINE, summary);
 
         return startMs;
     }
@@ -147,8 +149,8 @@ public final class VManagerRunsClient {
      * @param listener      optional task listener; when non-null the URL,
      *                      headers and payload are echoed to the build log.
      * @param sessionStartMillis  the session start time in ms, used to
-     *                            compute each point's {@code timeToEndMinutes}
-     *                            as {@code (endTimeMs - sessionStartMillis) / 60000}.
+     *                            compute each point's {@code timeToStartMinutes}
+     *                            as {@code (startTimeMs - sessionStartMillis) / 60000}.
      * @return list of {@link RunPoint} (never {@code null}).
      */
     public static List<RunPoint> fetchRunPoints(
@@ -197,9 +199,10 @@ public final class VManagerRunsClient {
         sort.put("direction", "ASCENDING");
         sortSpec.add(sort);
 
-        // ── projection: SELECTION_ONLY [duration, end_time] ──
+        // ── projection: SELECTION_ONLY [duration, start_time, end_time] ──
         JSONArray selection = new JSONArray();
         selection.add("duration");
+        selection.add("start_time");
         selection.add("end_time");
 
         JSONObject projection = new JSONObject();
@@ -220,10 +223,10 @@ public final class VManagerRunsClient {
                 + "\n  headers: Content-Type=application/json; charset=UTF-8, "
                 + "Accept=application/json, Authorization=Basic <redacted>"
                 + "\n  payload: " + payload;
-        if (listener != null) {
+        if (listener != null && BuildLog.isVerbose()) {
             listener.getLogger().println(debug);
         }
-        LOGGER.log(Level.INFO, debug);
+        LOGGER.log(Level.FINE, debug);
 
         // ── fire the request ──
         String responseBody = VManagerHttpClient.postJson(url, payload, creds);
@@ -239,11 +242,13 @@ public final class VManagerRunsClient {
             Object e = rows.get(i);
             if (!(e instanceof JSONObject)) continue;
             JSONObject row = (JSONObject) e;
-            double durationMinutes  = optDouble(row, "duration") / 60.0;            // sec → min
-            double endTimeMs        = optDouble(row, "end_time");
-            // Time elapsed from session start to this run's end (ms → min).
-            double timeToEndMinutes = (endTimeMs - sessionStartMillis) / 60000.0;
-            out.add(new RunPoint(timeToEndMinutes, durationMinutes));
+            double durationMinutes    = optDouble(row, "duration") / 60.0;            // sec → min
+            double startTimeMs        = optDouble(row, "start_time");
+            double endTimeMs          = optDouble(row, "end_time");
+            // Time elapsed from session start to this run's start / end (ms → min).
+            double timeToStartMinutes = (startTimeMs - sessionStartMillis) / 60000.0;
+            double timeToEndMinutes   = (endTimeMs   - sessionStartMillis) / 60000.0;
+            out.add(new RunPoint(timeToStartMinutes, timeToEndMinutes, durationMinutes));
         }
         return out;
     }

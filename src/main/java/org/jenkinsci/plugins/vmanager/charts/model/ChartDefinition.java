@@ -242,11 +242,11 @@ public class ChartDefinition extends AbstractDescribableImpl<ChartDefinition> {
             try {
                 StandardUsernamePasswordCredentials creds =
                         lookupCredentials(item, credentialsId, serverUrl);
-                LOGGER.log(Level.INFO, "Fetching vPlan list: POST {0} (creds={1})",
+                LOGGER.log(Level.FINE, "Fetching vPlan list: POST {0} (creds={1})",
                         new Object[]{url, creds == null ? "<none>" : creds.getId()});
                 String body = postJson(url, "{}", creds);
                 parseVPlanNames(body, m);
-                LOGGER.log(Level.INFO, "vPlan list: fetched {0} plan(s)",
+                LOGGER.log(Level.FINE, "vPlan list: fetched {0} plan(s)",
                         new Object[]{m.size()});
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING,

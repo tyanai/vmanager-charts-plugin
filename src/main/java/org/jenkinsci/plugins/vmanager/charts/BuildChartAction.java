@@ -73,44 +73,55 @@ public class BuildChartAction implements Action {
     // ── Regression Optimization Chart (chart #1) ─────────────────────────
 
     /**
-     * Result returned to the front-end Stapler proxy. Three groups; each
-     * group is a list of {@code [endTimeMinutes, durationMinutes]} points.
+     * Result returned to the front-end Stapler proxy. Two views (start-time
+     * and end-time), each split into Small/Medium/Large groups of
+     * {@code [xMinutes, durationMinutes]} points.
      */
     public static final class RegressionOptimizationData {
         private final List<double[]> small;
         private final List<double[]> medium;
         private final List<double[]> large;
+        private final List<double[]> smallEnd;
+        private final List<double[]> mediumEnd;
+        private final List<double[]> largeEnd;
         private final String error;
 
-        RegressionOptimizationData(List<double[]> small, List<double[]> medium,
-                                   List<double[]> large, String error) {
-            this.small  = small  == null ? Collections.<double[]>emptyList() : small;
-            this.medium = medium == null ? Collections.<double[]>emptyList() : medium;
-            this.large  = large  == null ? Collections.<double[]>emptyList() : large;
-            this.error  = error;
+        RegressionOptimizationData(List<double[]> small,    List<double[]> medium,    List<double[]> large,
+                                   List<double[]> smallEnd, List<double[]> mediumEnd, List<double[]> largeEnd,
+                                   String error) {
+            this.small     = small     == null ? Collections.<double[]>emptyList() : small;
+            this.medium    = medium    == null ? Collections.<double[]>emptyList() : medium;
+            this.large     = large     == null ? Collections.<double[]>emptyList() : large;
+            this.smallEnd  = smallEnd  == null ? Collections.<double[]>emptyList() : smallEnd;
+            this.mediumEnd = mediumEnd == null ? Collections.<double[]>emptyList() : mediumEnd;
+            this.largeEnd  = largeEnd  == null ? Collections.<double[]>emptyList() : largeEnd;
+            this.error     = error;
         }
 
-        public List<double[]> getSmall()  { return small;  }
-        public List<double[]> getMedium() { return medium; }
-        public List<double[]> getLarge()  { return large;  }
-        public String getError()          { return error;  }
+        public List<double[]> getSmall()     { return small;     }
+        public List<double[]> getMedium()    { return medium;    }
+        public List<double[]> getLarge()     { return large;     }
+        public List<double[]> getSmallEnd()  { return smallEnd;  }
+        public List<double[]> getMediumEnd() { return mediumEnd; }
+        public List<double[]> getLargeEnd()  { return largeEnd;  }
+        public String getError()             { return error;     }
     }
 
     /**
-     * Stapler/JS-callable: returns the Regression Optimization data that was
+     * Stapler/JS-callable: returns the Runs Duration chart data that was
      * fetched and stored on this build at build-completion time.
      */
     @JavaScriptMethod
     public RegressionOptimizationData getRegressionOptimizationData() {
         if (run == null) {
-            return new RegressionOptimizationData(null, null, null,
+            return new RegressionOptimizationData(null, null, null, null, null, null,
                     "No build context available.");
         }
         RegressionOptimizationBuildAction stored =
                 run.getAction(RegressionOptimizationBuildAction.class);
         if (stored == null) {
-            return new RegressionOptimizationData(null, null, null,
-                    "No regression-optimization data stored on this build "
+            return new RegressionOptimizationData(null, null, null, null, null, null,
+                    "No runs-duration data stored on this build "
                             + "(it is computed at build completion; rerun the build "
                             + "after enabling the chart, or check the build log for errors).");
         }
@@ -118,6 +129,9 @@ public class BuildChartAction implements Action {
                 new ArrayList<>(stored.getSmall()),
                 new ArrayList<>(stored.getMedium()),
                 new ArrayList<>(stored.getLarge()),
+                new ArrayList<>(stored.getSmallEnd()),
+                new ArrayList<>(stored.getMediumEnd()),
+                new ArrayList<>(stored.getLargeEnd()),
                 null);
     }
 }

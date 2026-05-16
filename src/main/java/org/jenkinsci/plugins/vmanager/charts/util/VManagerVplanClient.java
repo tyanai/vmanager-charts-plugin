@@ -162,7 +162,7 @@ public final class VManagerVplanClient {
         }
 
         String payload = body.toString();
-        if (listener != null) {
+        if (listener != null && BuildLog.isVerbose()) {
             listener.getLogger().println("[vManager Charts] POST " + url);
             listener.getLogger().println("[vManager Charts]   request headers:");
             listener.getLogger().println("[vManager Charts]     Content-Type: application/json; charset=UTF-8");
@@ -182,7 +182,7 @@ public final class VManagerVplanClient {
             String newOid = resp.header(VplanRoutingContext.HDR_OID);
             if (newOid != null && !newOid.isBlank()) {
                 routingCtx.setOid(vplan, dbVplan ? "DB" : "FILE", newOid);
-                if (listener != null) {
+                if (listener != null && BuildLog.isVerbose()) {
                     listener.getLogger().println("[vManager Charts]   response "
                             + VplanRoutingContext.HDR_OID + ": " + newOid);
                 }

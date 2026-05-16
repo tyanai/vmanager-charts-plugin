@@ -146,7 +146,7 @@ public final class VManagerMetricsClient {
         }
 
         String payload = body.toString();
-        if (listener != null) {
+        if (listener != null && BuildLog.isVerbose()) {
             listener.getLogger().println("[vManager Charts] POST " + url);
             listener.getLogger().println("[vManager Charts]   request headers:");
             listener.getLogger().println("[vManager Charts]     Content-Type: application/json; charset=UTF-8");
@@ -168,7 +168,7 @@ public final class VManagerMetricsClient {
             String newOid = resp.header(CoverageRoutingContext.HDR_OID);
             if (newOid != null && !newOid.isBlank()) {
                 routingCtx.setOid(newOid);
-                if (listener != null) {
+                if (listener != null && BuildLog.isVerbose()) {
                     listener.getLogger().println("[vManager Charts]   response "
                             + CoverageRoutingContext.HDR_OID + ": " + newOid);
                 }

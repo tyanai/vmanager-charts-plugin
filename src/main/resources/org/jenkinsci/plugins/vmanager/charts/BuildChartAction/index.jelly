@@ -9,19 +9,65 @@
 
             <st:bind var="vManagerBuildChartProxy" value="${it}"/>
 
-            <!-- Chart #1: Regression Optimization Chart -->
+            <!-- Runs Duration Chart (two views: by start_time and by end_time) -->
             <j:if test="${it.showRegressionOptimizationChart}">
                 <div class="chart-section">
-                    <h2>Regression Optimization Chart</h2>
+                    <h2>Runs Duration Chart</h2>
                     <div id="regressionOptimizationError"
                          style="display:none; color:#c00; margin:6px 0;"></div>
-                    <div id="regressionOptimizationChart"
+
+                    <h3>Runs Duration/Start time Chart</h3>
+                    <div id="runsDurationStartChart"
+                         style="width: 100%; height: 500px;"></div>
+
+                    <h3>Runs Duration/End time Chart</h3>
+                    <div id="runsDurationEndChart"
                          style="width: 100%; height: 500px;"></div>
                 </div>
             </j:if>
 
             <script type="text/javascript">
                 (function () {
+                    function buildOption(small, medium, large, xName, xLabel) {
+                        return {
+                            tooltip: {
+                                trigger: 'item',
+                                formatter: function (p) {
+                                    return p.seriesName
+                                        + '&lt;br/&gt;' + xLabel + ': ' + p.value[0].toFixed(2) + ' min'
+                                        + '&lt;br/&gt;Duration: ' + p.value[1].toFixed(2) + ' min';
+                                }
+                            },
+                            legend: {
+                                data: ['Small Duration (bottom 33%)',
+                                       'Medium Duration (middle 33%)',
+                                       'Large Duration (top 33%)'],
+                                top: 10
+                            },
+                            grid: { top: 60, left: '3%', right: '4%', bottom: 60, containLabel: true },
+                            xAxis: {
+                                type: 'value',
+                                name: xName,
+                                nameLocation: 'middle',
+                                nameGap: 30,
+                                scale: true
+                            },
+                            yAxis: {
+                                type: 'value',
+                                name: 'Duration (minutes)',
+                                nameLocation: 'middle',
+                                nameGap: 45,
+                                scale: true
+                            },
+                            series: [
+                                { name: 'Small Duration (bottom 33%)',  type: 'scatter', data: small,  symbolSize: 8, itemStyle: { color: '#52c41a' } },
+                                { name: 'Medium Duration (middle 33%)', type: 'scatter', data: medium, symbolSize: 8, itemStyle: { color: '#fa8c16' } },
+                                { name: 'Large Duration (top 33%)',     type: 'scatter', data: large,  symbolSize: 8, itemStyle: { color: '#f5222d' } }
+                            ],
+                            toolbox: { feature: { saveAsImage: { title: 'Save' } } }
+                        };
+                    }
+
                     function init() {
                         if (typeof echarts === 'undefined') {
                             console.error('[vManager Charts] echarts library not loaded.');
@@ -31,15 +77,19 @@
                             console.error('[vManager Charts] Stapler proxy not bound.');
                             return;
                         }
-                        var dom = document.getElementById('regressionOptimizationChart');
-                        if (!dom) return;
-                        var chart = echarts.init(dom);
-                        chart.showLoading();
+                        var domStart = document.getElementById('runsDurationStartChart');
+                        var domEnd   = document.getElementById('runsDurationEndChart');
+                        if (!domStart || !domEnd) return;
+                        var chartStart = echarts.init(domStart);
+                        var chartEnd   = echarts.init(domEnd);
+                        chartStart.showLoading();
+                        chartEnd.showLoading();
 
                         vManagerBuildChartProxy.getRegressionOptimizationData(function (response) {
                             try {
                                 var data = response.responseObject() || {};
-                                chart.hideLoading();
+                                chartStart.hideLoading();
+                                chartEnd.hideLoading();
 
                                 if (data.error) {
                                     var errBox = document.getElementById('regressionOptimizationError');
@@ -47,75 +97,33 @@
                                         errBox.textContent = data.error;
                                         errBox.style.display = 'block';
                                     }
-                                    console.warn('[vManager Charts] regression-optimization:', data.error);
+                                    console.warn('[vManager Charts] runs-duration:', data.error);
                                 }
 
-                                var small  = data.small  || [];
-                                var medium = data.medium || [];
-                                var large  = data.large  || [];
+                                chartStart.setOption(buildOption(
+                                    data.small     || [],
+                                    data.medium    || [],
+                                    data.large     || [],
+                                    'Time to start (minutes)',
+                                    'Time to start'));
 
-                                chart.setOption({
-                                    tooltip: {
-                                        trigger: 'item',
-                                        formatter: function (p) {
-                                            return p.seriesName
-                                                + '&lt;br/&gt;Time to end: ' + p.value[0].toFixed(2) + ' min'
-                                                + '&lt;br/&gt;Duration: '   + p.value[1].toFixed(2) + ' min';
-                                        }
-                                    },
-                                    legend: {
-                                        data: ['Small Duration (bottom 33%)',
-                                               'Medium Duration (middle 33%)',
-                                               'Large Duration (top 33%)'],
-                                        top: 10
-                                    },
-                                    grid: { top: 60, left: '3%', right: '4%', bottom: 60, containLabel: true },
-                                    xAxis: {
-                                        type: 'value',
-                                        name: 'Time to end (minutes)',
-                                        nameLocation: 'middle',
-                                        nameGap: 30,
-                                        scale: true
-                                    },
-                                    yAxis: {
-                                        type: 'value',
-                                        name: 'Duration (minutes)',
-                                        nameLocation: 'middle',
-                                        nameGap: 45,
-                                        scale: true
-                                    },
-                                    series: [
-                                        {
-                                            name: 'Small Duration (bottom 33%)',
-                                            type: 'scatter',
-                                            data: small,
-                                            symbolSize: 8,
-                                            itemStyle: { color: '#52c41a' }
-                                        },
-                                        {
-                                            name: 'Medium Duration (middle 33%)',
-                                            type: 'scatter',
-                                            data: medium,
-                                            symbolSize: 8,
-                                            itemStyle: { color: '#fa8c16' }
-                                        },
-                                        {
-                                            name: 'Large Duration (top 33%)',
-                                            type: 'scatter',
-                                            data: large,
-                                            symbolSize: 8,
-                                            itemStyle: { color: '#f5222d' }
-                                        }
-                                    ],
-                                    toolbox: { feature: { saveAsImage: { title: 'Save' } } }
-                                });
+                                chartEnd.setOption(buildOption(
+                                    data.smallEnd  || [],
+                                    data.mediumEnd || [],
+                                    data.largeEnd  || [],
+                                    'Time to end (minutes)',
+                                    'Time to end'));
                             } catch (e) {
-                                chart.hideLoading();
-                                console.error('[vManager Charts] regression-optimization error:', e);
+                                chartStart.hideLoading();
+                                chartEnd.hideLoading();
+                                console.error('[vManager Charts] runs-duration error:', e);
                             }
                         });
 
-                        window.addEventListener('resize', function () { chart.resize(); });
+                        window.addEventListener('resize', function () {
+                            chartStart.resize();
+                            chartEnd.resize();
+                        });
                     }
 
                     if (document.readyState === 'loading') {

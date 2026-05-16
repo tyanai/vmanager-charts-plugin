@@ -1,6 +1,93 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form" xmlns:c="/lib/credentials">
     <!--
+        Fetch-dedup wrapper: collapse the many identical vManager-backed
+        fill REST calls that Jenkins fires on page load (one per chart row
+        for vPlan paths, and one per metric row for each entity-type
+        attribute list) into at most one network request per distinct
+        result set:
+            * AttributeNameItems is keyed by entityType   (≤ 3 keys)
+            * VPlanPathItems     is keyed by URL          (1 key)
+
+        On page load every visible row still triggers a fetch through
+        Jenkins' combobox2 — but only the first fetch for each key
+        actually leaves the browser. All other concurrent / later fetches
+        are served from a cloned cached Response, so the per-row response
+        interceptors in MetricDefinition / ChartDefinition still see a
+        real Response object, parse it, and populate their per-row
+        itemsByEntity caches normally.
+
+        Installed as the FIRST script in this jelly so we wrap fetch
+        BEFORE Jenkins' combobox initialization runs.
+    -->
+    <script>
+(function () {
+    if (window.__vmpFetchDedupInstalled) return;
+    window.__vmpFetchDedupInstalled = true;
+
+    var cache = {};   // key -> Promise&lt;Response&gt; (un-consumed; cloned per caller)
+
+    function paramFromUrl(url, name) {
+        var m = new RegExp('[?&amp;]' + name + '=([^&amp;]*)').exec(url || '');
+        return m ? decodeURIComponent(m[1]) : '';
+    }
+    function paramFromBody(body, name) {
+        if (!body) return '';
+        try {
+            if (body instanceof FormData) {
+                var v = body.get(name);
+                return v != null ? String(v) : '';
+            }
+            var s = (typeof body === 'string') ? body
+                  : (body instanceof URLSearchParams) ? body.toString()
+                  : (typeof body.toString === 'function') ? body.toString()
+                  : '';
+            var m = new RegExp('(?:^|&amp;)' + name + '=([^&amp;]*)').exec(s);
+            return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : '';
+        } catch (e) { return ''; }
+    }
+
+    function keyFor(url, init) {
+        if (/AttributeNameItems/.test(url)) {
+            var ent = paramFromUrl(url, 'entityType')
+                   || paramFromBody(init &amp;&amp; init.body, 'entityType');
+            return 'attr:' + ent;
+        }
+        if (/VPlanPathItems/.test(url)) {
+            return 'vplan';
+        }
+        return null;
+    }
+
+    var origFetch = window.fetch;
+    window.fetch = function (input, init) {
+        var url = (typeof input === 'string') ? input
+                : (input &amp;&amp; input.url) ? input.url : '';
+        var key = keyFor(url, init);
+        if (!key) return origFetch.apply(this, arguments);
+
+        if (!cache[key]) {
+            // First request for this key: actually hit the network.
+            // Store the un-consumed Response so callers can clone it.
+            cache[key] = origFetch.apply(this, arguments).then(
+                function (rsp) {
+                    if (!rsp.ok) delete cache[key];   // don't cache failures
+                    return rsp;
+                },
+                function (err) {
+                    delete cache[key];
+                    throw err;
+                }
+            );
+        }
+        // Every caller (including the very first) gets a fresh clone so
+        // its body stream is independent of the cached Response and of
+        // any other caller's clone.
+        return cache[key].then(function (rsp) { return rsp.clone(); });
+    };
+})();
+    </script>
+    <!--
         Help-icon styling (scoped to .vmp-charts-root, which wraps the entire
         plugin block including child Jellies for ChartDefinition / MetricDefinition).
         For NON-checkbox fields the description is hidden and replaced by a "?"
@@ -77,7 +164,7 @@
         <div class="vmp-server-row">
         <f:entry title="vManager Server URL"
                  field="serverUrl"
-                 description="Base URL of the vManager REST API (e.g. https://ilvmanager08:50500/vmgr/vapi).">
+                 description="Base URL of the vManager REST API (e.g. https://host:port/vmgr/vapi).">
             <f:textbox clazz="vmp-server-url"/>
         </f:entry>
         <f:entry title="Credentials"
@@ -88,32 +175,117 @@
         </div>
         <f:entry title="vManager Session"
                  field="sessionSource"
-                 description="How the vManager session name(s) executed by this build are obtained. Choose 'Leverage vManager Jenkins Plugin Information' to use the data recorded by the vManager Jenkins Plugin during the build, or 'Input file name' to read session names from a text file (one session name per line).">
+                 description="How the vManager session name(s) executed by this build are obtained. Choose 'Leverage vManager Jenkins Plugin Information' to use the data recorded by the vManager Jenkins Plugin during the build (if you are using 'collect' mode no plugin change is required; if you are using 'launch' mode you must upgrade to the latest version so it can create the BUILD_ID.BUILD_VERSION.sessions.input file), or 'Input file name' to read session names from a text file (one session name per line). The session-source choice is always taken from this GUI — never from a JSON file.">
             <f:select/>
         </f:entry>
         <div class="vmp-session-file-cond" style="display:none;">
             <f:entry title="Session Input File"
                      field="sessionInputFile"
-                     description="Optional. Absolute or workspace-relative path to a text file containing one session name per line. If left empty, the plugin will look in the build's workspace for a file named \${BUILD_NUMBER}.\${BUILD_ID}.sessions.input">
+                     description="Optional. Absolute or workspace-relative path to a text file containing one session name per line. If left empty, the plugin will look in the build's workspace for a file named BUILD_ID.BUILD_VERSION.sessions.input">
                 <f:textbox/>
             </f:entry>
         </div>
+        <f:section title="Charts configuration"/>
+        <f:entry description="Choose where the chart selection and Custom Chart definitions come from. Server URL, credentials and vManager Session above are always taken from this GUI — even when 'JSON file from workspace' is selected.">
+            <span style="font-size:0.85rem;">
+                Pick GUI to configure charts here, or JSON file to load the
+                entire chart selection (built-in charts and Custom Charts) from
+                a workspace JSON file at build completion.
+            </span>
+        </f:entry>
+        <f:radioBlock name="configSource"
+                      value="GUI"
+                      title="GUI (configure charts below)"
+                      help="${descriptor.getHelpFile('configSourceGui')}"
+                      checked="${instance == null or instance.configSource == null or instance.configSource == '' or instance.configSource == 'GUI'}"
+                      inline="true">
+            <f:optionalBlock name="showBuildLevelCharts"
+                             title="Build Level Charts"
+                             help="${descriptor.getHelpFile('showBuildLevelCharts')}"
+                             checked="${instance != null and instance.showBuildLevelCharts}"
+                             inline="true">
+                <f:entry title="Runs Duration Chart"
+                         field="showRegressionOptimizationChart"
+                         help="${descriptor.getHelpFile('showRegressionOptimizationChart')}">
+                    <f:checkbox name="showRegressionOptimizationChart"
+                                checked="${instance != null and instance.showRegressionOptimizationChart}"/>
+                </f:entry>
+            </f:optionalBlock>
+            <f:entry title="Build Duration Chart"
+                     field="showBuildDuration">
+                <f:checkbox name="showBuildDuration" checked="${instance != null and instance.showBuildDuration}"/>
+            </f:entry>
+            <f:entry title="Success/Failure Rate Chart"
+                     field="showSuccessRate">
+                <f:checkbox name="showSuccessRate" checked="${instance != null and instance.showSuccessRate}"/>
+            </f:entry>
+            <f:entry title="Regression Anomaly Detection Summary"
+                     field="showTestResults">
+                <f:checkbox name="showTestResults" checked="${instance != null and instance.showTestResults}"/>
+            </f:entry>
+            <f:optionalBlock name="showCustomMetrics"
+                             title="Custom Charts"
+                             checked="${instance != null and instance.showCustomMetrics}"
+                             help="${descriptor.getHelpFile('showCustomMetrics')}"
+                             inline="true">
+                <f:entry title="Charts"
+                         description="One chart will be drawn per entry. Each chart can include multiple metric series.">
+                    <f:repeatableProperty field="customCharts" add="Add Chart"/>
+                </f:entry>
+            </f:optionalBlock>
+            <f:entry>
+                <button type="button" class="vmp-export-btn jenkins-button">
+                    Export configuration to JSON
+                </button>
+                <span class="vmp-export-msg" style="margin-left:8px; font-size:0.85rem; color:var(--text-color-secondary,#666);">
+                    Downloads the entire chart configuration shown above
+                    (built-in chart selection + every Custom Chart with its
+                    metric series) as a JSON file. Server URL, credentials and
+                    vManager Session are intentionally excluded — they are
+                    always taken from this GUI at build time.
+                </span>
+            </f:entry>
+        </f:radioBlock>
+        <f:radioBlock name="configSource"
+                      value="FILE"
+                      title="JSON file from workspace"
+                      help="${descriptor.getHelpFile('configSourceFile')}"
+                      checked="${instance != null and instance.configSource == 'FILE'}"
+                      inline="true">
+            <f:entry title="Config JSON File"
+                     field="configFilePath"
+                     description="Optional. Absolute or workspace-relative path to a JSON config file produced manually or by the 'Export configuration to JSON' button. If left empty, the plugin will look for vmanager-charts.config.json in the build's workspace. The file fully replaces the chart configuration; only Server URL, credentials and vManager Session continue to come from this GUI.">
+                <f:textbox/>
+            </f:entry>
+        </f:radioBlock>
+        <f:entry title="Verbose build logging"
+                 field="verboseLogging"
+                 help="${descriptor.getHelpFile('verboseLogging')}">
+            <f:checkbox name="verboseLogging" checked="${instance != null and instance.verboseLogging}"/>
+        </f:entry>
         <script>
 (function () {
     if (window.__vmpSessionSrcHooked) return;
     window.__vmpSessionSrcHooked = true;
 
-    function sync(root) {
-        var sel = (root || document).querySelector('select[name$="sessionSource"]');
+    function syncByName(root, selectName, condClass) {
+        var sel = (root || document).querySelector('select[name$="' + selectName + '"]');
         if (!sel) return;
-        var cond = sel.closest('.vmp-charts-root, form, body')
-                       .querySelector('.vmp-session-file-cond');
+        var scope = sel.closest('.vmp-charts-root, form, body');
+        if (!scope) return;
+        var cond = scope.querySelector('.' + condClass);
         if (!cond) return;
         cond.style.display = (sel.value === 'FILE') ? '' : 'none';
-        if (!sel.__vmpSessionBound) {
-            sel.__vmpSessionBound = true;
-            sel.addEventListener('change', function () { sync(); });
+        if (!sel.__vmpSyncBound) {
+            sel.__vmpSyncBound = true;
+            sel.addEventListener('change', function () {
+                cond.style.display = (sel.value === 'FILE') ? '' : 'none';
+            });
         }
+    }
+
+    function sync(root) {
+        syncByName(root, 'sessionSource', 'vmp-session-file-cond');
     }
 
     new MutationObserver(function () { sync(); })
@@ -122,6 +294,141 @@
         document.addEventListener('DOMContentLoaded', function () { sync(); });
     } else {
         sync();
+    }
+})();
+        </script>
+        <!-- Export configuration button: POSTs the live form (via Jenkins'
+             buildFormTree) to the descriptor's doExportConfig endpoint, which
+             extracts our subtree, binds it (including all Custom Charts /
+             metrics / refinement files), strips credentials, and streams a
+             canonical JSON file back as a download. -->
+        <script>
+(function () {
+    if (window.__vmpExportHooked) return;
+    window.__vmpExportHooked = true;
+
+    function getCrumb() {
+        var meta = document.querySelector('meta[name="crumb"]');
+        if (meta) {
+            return {
+                fieldName: meta.getAttribute('crumb-field') || 'Jenkins-Crumb',
+                value:     meta.getAttribute('crumb-value') || meta.getAttribute('content') || ''
+            };
+        }
+        if (typeof window.crumb !== 'undefined' &amp;&amp; window.crumb &amp;&amp; window.crumb.value) {
+            return {
+                fieldName: window.crumb.fieldName || 'Jenkins-Crumb',
+                value:     window.crumb.value
+            };
+        }
+        return null;
+    }
+
+    function rootURL() {
+        var meta = document.querySelector('meta[name="ROOT_URL"]');
+        if (meta &amp;&amp; meta.content) return meta.content.replace(/\/$/, '');
+        if (typeof window.rootURL === 'string') return window.rootURL.replace(/\/$/, '');
+        var head = document.querySelector('head');
+        if (head &amp;&amp; head.dataset &amp;&amp; head.dataset.rooturl) return head.dataset.rooturl.replace(/\/$/, '');
+        return '';
+    }
+
+    function endpoint() {
+        return rootURL()
+            + '/descriptorByName/org.jenkinsci.plugins.vmanager.charts.VManagerChartsJobProperty/exportConfig';
+    }
+
+    function downloadBlob(blob, filename) {
+        var url = URL.createObjectURL(blob);
+        var a   = document.createElement('a');
+        a.href     = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    }
+
+    function onClick(btn) {
+        var form = btn.closest('form');
+        if (!form) {
+            alert('vManager Charts: could not find the surrounding form.');
+            return;
+        }
+        if (typeof buildFormTree !== 'function') {
+            alert('vManager Charts: Jenkins form-builder (buildFormTree) is not available; cannot export.');
+            return;
+        }
+        var tree;
+        try {
+            buildFormTree(form);
+            // After buildFormTree(), Jenkins stores the JSON in the form's
+            // hidden "json" input; that's the exact same payload Jenkins'
+            // own "Save" button submits.
+            var jsonInput = form.querySelector('input[name="json"]');
+            tree = jsonInput ? jsonInput.value : null;
+        } catch (e) {
+            alert('vManager Charts: failed to read form data: ' + (e &amp;&amp; e.message ? e.message : e));
+            return;
+        }
+        if (!tree) {
+            alert('vManager Charts: form has no serialized JSON payload.');
+            return;
+        }
+
+        var fd = new FormData();
+        fd.append('json', tree);
+
+        var crumb   = getCrumb();
+        var headers = {};
+        if (crumb &amp;&amp; crumb.value) {
+            headers[crumb.fieldName] = crumb.value;
+            fd.append(crumb.fieldName, crumb.value);
+        }
+
+        btn.disabled = true;
+        var origText = btn.textContent;
+        btn.textContent = 'Exporting…';
+
+        fetch(endpoint(), {
+            method:      'POST',
+            body:        fd,
+            headers:     headers,
+            credentials: 'same-origin'
+        }).then(function (r) {
+            if (!r.ok) {
+                return r.text().then(function (t) {
+                    throw new Error('HTTP ' + r.status + ': ' + (t || r.statusText));
+                });
+            }
+            return r.blob();
+        }).then(function (blob) {
+            downloadBlob(blob, 'vmanager-charts.config.json');
+        }).catch(function (err) {
+            alert('vManager Charts: export failed — ' + (err &amp;&amp; err.message ? err.message : err));
+        }).then(function () {
+            btn.disabled = false;
+            btn.textContent = origText;
+        });
+    }
+
+    function attach() {
+        document.querySelectorAll('.vmp-charts-root .vmp-export-btn').forEach(function (btn) {
+            if (btn.__vmpExportBound) return;
+            btn.__vmpExportBound = true;
+            btn.addEventListener('click', function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                onClick(btn);
+            });
+        });
+    }
+
+    new MutationObserver(attach).observe(document.body, { childList: true, subtree: true });
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attach);
+    } else {
+        attach();
     }
 })();
         </script>
@@ -211,38 +518,6 @@
     }
 })();
         </script>
-        <f:optionalBlock name="showBuildLevelCharts"
-                         title="Build Level Charts"
-                         checked="${instance != null and instance.showBuildLevelCharts}"
-                         inline="true">
-            <f:entry title="Regression Optimization Chart"
-                     field="showRegressionOptimizationChart">
-                <f:checkbox name="showRegressionOptimizationChart"
-                            checked="${instance != null and instance.showRegressionOptimizationChart}"/>
-            </f:entry>
-        </f:optionalBlock>
-        <f:entry title="Build Duration Chart"
-                 field="showBuildDuration">
-            <f:checkbox name="showBuildDuration" checked="${instance == null or instance.showBuildDuration}"/>
-        </f:entry>
-        <f:entry title="Success/Failure Rate Chart"
-                 field="showSuccessRate">
-            <f:checkbox name="showSuccessRate" checked="${instance == null or instance.showSuccessRate}"/>
-        </f:entry>
-        <f:entry title="Test Results Trend Chart"
-                 field="showTestResults">
-            <f:checkbox name="showTestResults" checked="${instance == null or instance.showTestResults}"/>
-        </f:entry>
-        <f:optionalBlock name="showCustomMetrics"
-                         title="Custom Charts"
-                         checked="${instance != null and instance.showCustomMetrics}"
-                         help="${descriptor.getHelpFile('showCustomMetrics')}"
-                         inline="true">
-            <f:entry title="Charts"
-                     description="One chart will be drawn per entry. Each chart can include multiple metric series.">
-                <f:repeatableProperty field="customCharts" add="Add Chart"/>
-            </f:entry>
-        </f:optionalBlock>
     </f:optionalBlock>
     </div>
     <j:if test="${true}">
@@ -252,8 +527,9 @@
     window.__vmpHelpBtnInstalled = true;
 
     function isCheckboxRow(formItem) {
-        // f:entry containing a checkbox uses Jenkins' built-in help — skip.
-        return !!formItem.querySelector('input[type="checkbox"]');
+        // f:entry containing a checkbox or radio uses Jenkins' built-in
+        // help — skip so we don't add a duplicate / mis-placed '?' icon.
+        return !!formItem.querySelector('input[type="checkbox"], input[type="radio"]');
     }
 
     function findTitleEl(formItem) {

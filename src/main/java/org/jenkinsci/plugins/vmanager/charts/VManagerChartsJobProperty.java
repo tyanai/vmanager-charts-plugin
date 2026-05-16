@@ -19,6 +19,11 @@ import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.StaplerRequest;
+import org.kohsuke.stapler.StaplerResponse;
+import org.kohsuke.stapler.interceptor.RequirePOST;
+import org.jenkinsci.plugins.vmanager.charts.util.JsonConfigLoader;
+import net.sf.json.JSONObject;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
@@ -32,9 +37,9 @@ import java.util.List;
 public class VManagerChartsJobProperty extends JobProperty<Job<?, ?>> {
 
     private boolean enabled = true;
-    private boolean showBuildDuration = true;
-    private boolean showSuccessRate = true;
-    private boolean showTestResults = true;
+    private boolean showBuildDuration = false;
+    private boolean showSuccessRate = false;
+    private boolean showTestResults = false;
     private boolean showCustomMetrics = false;
     private boolean showBuildLevelCharts = false;
     private boolean showRegressionOptimizationChart = false;
@@ -57,6 +62,33 @@ public class VManagerChartsJobProperty extends JobProperty<Job<?, ?>> {
      */
     private String sessionInputFile = "";
     private List<ChartDefinition> customCharts = new ArrayList<>();
+
+    /**
+     * Where the chart configuration is sourced from at build time.
+     * "GUI"  = use the values stored on this property (the default).
+     * "FILE" = at build completion, load a JSON file from the build's
+     *          workspace and apply its values, ignoring everything below
+     *          this on the property except for {@link #credentialsId},
+     *          which always comes from the GUI.
+     */
+    private String configSource = "GUI";
+    /**
+     * When {@link #configSource} = "FILE", absolute or workspace-relative
+     * path to the JSON file. When blank, the listener looks for
+     * {@code vmanager-charts.config.json} in the build's workspace.
+     */
+    private String configFilePath = "";
+
+    /**
+     * When {@code true}, the listener emits chatty {@code [vManager Charts]}
+     * trace lines (REST URLs, headers, payloads, per-session listings, etc.)
+     * to the build's console. When {@code false} (default) only WARNING / error
+     * lines are printed. Note: this only controls build-console output; the
+     * separate {@code java.util.logging} traces (in MetricDefinition,
+     * ChartDefinition, VManagerRunsClient) are at FINE level — enable them
+     * via Manage Jenkins → System Log.
+     */
+    private boolean verboseLogging = false;
 
     @DataBoundConstructor
     public VManagerChartsJobProperty() {
@@ -193,6 +225,34 @@ public class VManagerChartsJobProperty extends JobProperty<Job<?, ?>> {
         this.sessionInputFile = sessionInputFile == null ? "" : sessionInputFile.trim();
     }
 
+    public String getConfigSource() {
+        return configSource == null || configSource.isBlank() ? "GUI" : configSource;
+    }
+
+    @DataBoundSetter
+    public void setConfigSource(String configSource) {
+        this.configSource = configSource == null || configSource.isBlank()
+                ? "GUI" : configSource;
+    }
+
+    public String getConfigFilePath() {
+        return configFilePath == null ? "" : configFilePath;
+    }
+
+    @DataBoundSetter
+    public void setConfigFilePath(String configFilePath) {
+        this.configFilePath = configFilePath == null ? "" : configFilePath.trim();
+    }
+
+    public boolean isVerboseLogging() {
+        return verboseLogging;
+    }
+
+    @DataBoundSetter
+    public void setVerboseLogging(boolean verboseLogging) {
+        this.verboseLogging = verboseLogging;
+    }
+
     @Extension
     public static class DescriptorImpl extends JobPropertyDescriptor {
 
@@ -257,8 +317,7 @@ public class VManagerChartsJobProperty extends JobProperty<Job<?, ?>> {
             return m;
         }
 
-        public FormValidation doCheckMaxBuilds(@QueryParameter String value) {
-            if (value == null || value.isBlank()) {
+        public FormValidation doCheckMaxBuilds(@QueryParameter String value) {            if (value == null || value.isBlank()) {
                 return FormValidation.error("Maximum builds is required (use 0 for unlimited).");
             }
             int n;
@@ -276,6 +335,72 @@ public class VManagerChartsJobProperty extends JobProperty<Job<?, ?>> {
                         + "This may be slow on jobs with very long history.");
             }
             return FormValidation.ok();
+        }
+
+        /**
+         * Exports the currently-edited (unsaved) plugin configuration as a
+         * downloadable JSON file. The browser POSTs the full job-config form
+         * tree (built via Jenkins' {@code buildFormTree}); we walk it to find
+         * the subtree that holds this plugin's fields, bind it to a transient
+         * {@link VManagerChartsJobProperty}, and serialize via
+         * {@link JsonConfigLoader#toJson(VManagerChartsJobProperty)}.
+         * The {@code credentialsId} field is never included in the output.
+         */
+        @RequirePOST
+        public void doExportConfig(StaplerRequest req, StaplerResponse rsp) throws Exception {
+            JSONObject form = req.getSubmittedForm();
+            JSONObject ours = findPluginSubtree(form);
+            if (ours == null) {
+                rsp.sendError(StaplerResponse.SC_BAD_REQUEST,
+                        "Could not locate vManager Charts configuration in the submitted form.");
+                return;
+            }
+            VManagerChartsJobProperty bound;
+            try {
+                bound = req.bindJSON(VManagerChartsJobProperty.class, ours);
+            } catch (Exception bindEx) {
+                rsp.sendError(StaplerResponse.SC_BAD_REQUEST,
+                        "Failed to parse configuration: " + bindEx.getMessage());
+                return;
+            }
+            String body = JsonConfigLoader.toJson(bound);
+            rsp.setContentType("application/json;charset=UTF-8");
+            rsp.setHeader("Content-Disposition",
+                    "attachment; filename=\"vmanager-charts.config.json\"");
+            byte[] bytes = body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            rsp.setContentLength(bytes.length);
+            rsp.getOutputStream().write(bytes);
+        }
+
+        /**
+         * Recursively searches a submitted form JSON tree for the subtree
+         * that contains this plugin's configuration. The marker is the
+         * presence of {@code serverUrl} together with at least one of the
+         * other distinctive fields produced by our {@code config.jelly}.
+         * Inside an {@code <f:optionalBlock name="enabled">} the contents
+         * appear nested under the {@code "enabled"} key; this walk handles
+         * any level of nesting that Jenkins may add around the property.
+         */
+        private static JSONObject findPluginSubtree(Object node) {
+            if (node instanceof JSONObject) {
+                JSONObject obj = (JSONObject) node;
+                if (obj.has("serverUrl") &&
+                        (obj.has("vManagerSchema") || obj.has("sessionSource")
+                                || obj.has("showBuildDuration") || obj.has("showCustomMetrics"))) {
+                    return obj;
+                }
+                for (Object key : obj.keySet()) {
+                    JSONObject hit = findPluginSubtree(obj.get((String) key));
+                    if (hit != null) return hit;
+                }
+            } else if (node instanceof net.sf.json.JSONArray) {
+                net.sf.json.JSONArray arr = (net.sf.json.JSONArray) node;
+                for (int i = 0; i < arr.size(); i++) {
+                    JSONObject hit = findPluginSubtree(arr.get(i));
+                    if (hit != null) return hit;
+                }
+            }
+            return null;
         }
     }
 }
