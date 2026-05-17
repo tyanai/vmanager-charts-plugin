@@ -21,43 +21,43 @@ session, coverage and vPlan data. This plugin uses that API to:
   dedicated **vManager Charts** page in the job's left sidebar.
 
 There is no required pre-existing integration with the
-[Cadence vManager Plugin](https://plugins.jenkins.io/vmanager-plugin) � the
+[Cadence vManager Plugin](https://plugins.jenkins.io/vmanager-plugin) - the
 charts plugin can read session names from a workspace file. However, when the
 vManager Plugin is also installed, this plugin can pick up session names
 automatically.
 
 ## Features
 
-- **Job-level integration** � adds a **vManager Charts** link to the job's
+- **Job-level integration** - adds a **vManager Charts** link to the job's
   left sidebar; rendering uses the
   [ECharts API plugin](https://plugins.jenkins.io/echarts-api/) for zoom,
   tooltips and PNG export.
-- **Build-level charts** � a separate **vManager Charts** link is also added
+- **Build-level charts** - a separate **vManager Charts** link is also added
   to every individual build's sidebar. These charts are populated per build
   (not aggregated across the job) and currently include the **Runs Duration
   Chart**, which renders a distribution of the build's runs by start time
   (X axis) and run duration (Y axis), so you can spot if there's any
   potential for faster turn-around time for the overall regression.
-- **Build Duration Chart** � line chart showing each build's wall-clock
+- **Build Duration Chart** - line chart showing each build's wall-clock
   duration over the configured window (50 last builds) (no Verisium Manager server required).
-- **Success/Failure Rate Chart** � stacked bar chart of build outcomes
+- **Success/Failure Rate Chart** - stacked bar chart of build outcomes
   (success / failure / unstable / aborted) over the configured window (50 last builds)
   (no Verisium Manager server required).
 - **Custom Metrics charts** sourced from Verisium Manager vAPI:
-  - **Session Level** � Chart on any numeric session attribute across the build's
+  - **Session Level** - Chart on any numeric session attribute across the build's
     sessions (one POST to `/rest/sessions/list` per chart).
-  - **vPlan Level** � Chart on any any numeric vPlan attribute under a vPlan + optional
+  - **vPlan Level** - Chart on any any numeric vPlan attribute under a vPlan + optional
     hierarchy path (one POST to `/rest/vplan/get` per hierarchy).
-  - **Coverage Level** � Chart on any numeric coverage attribute under an optional
+  - **Coverage Level** - Chart on any numeric coverage attribute under an optional
     coverage hierarchy + verification scope (one POST to `/rest/metrics/get`
     per hierarchy).
     (Attributes that share the same hierarchy only need to have the verification scope 
     filled in for the first one.)
-- **Two configuration sources** � *GUI (wizard)* or **JSON file from
+- **Two configuration sources** - *GUI (wizard)* or **JSON file from
   workspace** loaded at build time. Pick the workspace path for fully
   data-driven, per-build chart definitions; see
   [Configuration source](#configuration-source-gui-vs-json-file).
-- **Export configuration to JSON** � one-click export of the current GUI
+- **Export configuration to JSON** - one-click export of the current GUI
   configuration to a JSON file you can check into source control,
   hand-edit and later drop into a build's workspace as the JSON config
   source. Credentials, server URL and session source are intentionally
@@ -65,26 +65,26 @@ automatically.
 - **Per-metric chart type**: `line`, `bar` or `scatter`.
 - **Multiple charts per job**, each with its own title, max-builds window and
   list of metrics.
-- **Same attribute, multiple times in a chart** � supported via the
+- **Same attribute, multiple times in a chart** - supported via the
   per-metric **Nickname** field; one REST fetch fans out to all duplicates.
 - **Refinement files** for Coverage / vPlan attribute resolution.
-- **Live form validation** � every server-dependant field pings vManager and
+- **Live form validation** - every server-dependant field pings vManager and
   shows red inline errors on the spot (auth/404/TLS/connection failures, etc.).
-- **Verbose build logging toggle** � by default the per-build console is
+- **Verbose build logging toggle** - by default the per-build console is
   quiet (only WARNING / error lines from the plugin are printed). Tick
   **Verbose build logging** on the job to get every REST URL, request
   header, payload, response routing OID and per-session listing on the
   build's console while reproducing an issue.
-- **System-log diagnostics at `FINE`** � the same trace lines are also
+- **System-log diagnostics at `FINE`** - the same trace lines are also
   emitted to Jenkins' system log via `java.util.logging` at `FINE` level
   under the package `org.jenkinsci.plugins.vmanager.charts`. They are
   hidden by default; enable them via a Log Recorder (see
   [System log diagnostics](#system-log-diagnostics)).
-- **REST de-duplication** � attribute lists (per entity type) and the vPlan
+- **REST de-duplication** - attribute lists (per entity type) and the vPlan
   list are fetched at most once per configuration page load and reused
   across every combobox row, regardless of how many charts / metrics you
   have configured.
-- **Pipeline-friendly** � the job property is configured via the standard
+- **Pipeline-friendly** - the job property is configured via the standard
   Jenkins Configure UI; no DSL step is required.
 
 ## Plugin Dependencies
@@ -98,9 +98,9 @@ Required:
 
 Optional:
 
-- [JUnit plugin](https://plugins.jenkins.io/junit/) � required for the **Test
+- [JUnit plugin](https://plugins.jenkins.io/junit/) - required for the **Test
   Results** built-in chart.
-- [Cadence vManager Plugin](https://plugins.jenkins.io/vmanager-plugin) �
+- [Cadence vManager Plugin](https://plugins.jenkins.io/vmanager-plugin) -
   required only when the **Session source** is set to *Leverage vManager
   Jenkins Plugin Information*.
 
@@ -134,9 +134,9 @@ All configuration lives in the job's **Configure** page, under the
 | **Enable vManager Charts** | `false` | Master on/off switch for this job. When unchecked the **vManager Charts** sidebar link is hidden and no per-build metric collection runs. |
 | **vManager Server URL** | *(empty)* | **Required** when *Enable* is on. See [Verisium Manager connection](#verisium-manager-connection-when-show-custom-metrics-is-on) below. |
 | **Credentials** | *(empty)* | **Required** when *Enable* is on. Standard Jenkins username/password credentials. |
-| **vManager Session** | *Leverage vManager Jenkins Plugin Information* | See [Session source](#session-source). Always taken from the GUI � never from a JSON config file. |
+| **vManager Session** | *Leverage vManager Jenkins Plugin Information* | See [Session source](#session-source). Always taken from the GUI - never from a JSON config file. |
 | **Configuration source** | `GUI (configure charts below)` | Radio. Choose **GUI** to define charts via the wizard below, or **JSON file from workspace** to load the entire chart configuration from a workspace JSON file at build completion. See [Configuration source](#configuration-source-gui-vs-json-file). |
-| **Verbose build logging** | `false` | When on, every `[vManager Charts]` diagnostic line (REST URLs, request headers, payloads, response routing OIDs, per-session listings, summary counters, etc.) is printed to the build's console. When off, only WARNING and error lines appear. Always taken from the GUI � never from a JSON config file. |
+| **Verbose build logging** | `false` | When on, every `[vManager Charts]` diagnostic line (REST URLs, request headers, payloads, response routing OIDs, per-session listings, summary counters, etc.) is printed to the build's console. When off, only WARNING and error lines appear. Always taken from the GUI - never from a JSON config file. |
 
 The checkboxes below are shown only when **Configuration source = GUI**:
 
@@ -147,7 +147,7 @@ The checkboxes below are shown only when **Configuration source = GUI**:
 | **Build Duration Chart** | `false` | Show the built-in line chart of build duration. |
 | **Success/Failure Rate Chart** | `false` | Show the built-in stacked bar of build outcomes. |
 | **Regression Anomaly Detection Summary** | `false` | Show the built-in stacked bar of pass/fail/skip from JUnit results. |
-| **Maximum builds** | `50` | How many of the most-recent builds the **built-in** charts plot. `0` = no limit (slow on long histories � a yellow warning is shown). |
+| **Maximum builds** | `50` | How many of the most-recent builds the **built-in** charts plot. `0` = no limit (slow on long histories - a yellow warning is shown). |
 | **Show Custom Metrics** | `false` | Reveals the **Custom Charts** repeatable list below. |
 
 ### Verisium Manager connection
@@ -164,7 +164,7 @@ set to **JSON file from workspace**.*
 
 #### Session source
 
-Select where the per-build session names come from � these names drive every
+Select where the per-build session names come from - these names drive every
 custom-metric REST call.
 
 | Option | Behaviour |
@@ -191,7 +191,7 @@ Charts** page. Each chart has:
 | **Chart Title** | *(empty, required)* | Rendered above the chart. |
 | **Maximum builds** | `50` | How many of the most-recent builds *this* chart plots. `0` = no limit. |
 | **vPlan Type** | `-- None --` | `DB (from server)` or `File (local path)`. Required when this chart contains any **vPlan Level** metrics; ignored otherwise. |
-| **vPlan** | *(empty)* | When **vPlan Type** = `DB`, a combobox populated by `POST {serverUrl}/rest/vplan/list-vplans` showing every available `vplan_name`. When **vPlan Type** = `FILE`, type the absolute path to a `.vplan` file. The vPlan applies to **the whole chart** � every vPlan-level metric in the chart shares it. |
+| **vPlan** | *(empty)* | When **vPlan Type** = `DB`, a combobox populated by `POST {serverUrl}/rest/vplan/list-vplans` showing every available `vplan_name`. When **vPlan Type** = `FILE`, type the absolute path to a `.vplan` file. The vPlan applies to **the whole chart** - every vPlan-level metric in the chart shares it. |
 
 Then add one or more **Metrics** to the chart.
 
@@ -201,8 +201,8 @@ Then add one or more **Metrics** to the chart.
 |-------|---------|-------|
 | **Entity Type** | `Session Level` | One of: `Session Level`, `vPlan Level`, `Coverage Level`. Drives which REST endpoint and which sub-fields are relevant. |
 | **Attribute Name** | *(empty, required)* | Combobox populated from vManager. vPlan / Coverage are populated by `GET /rest/$schema/response?action=list-vplan-tree-sub-entities&component=tracking-configuration&extended=true` (vPlan) or `...list-metrics-tree-sub-entities...` (Coverage) and shown as `Title (id)`. The displayed string is what's saved, so the combobox stays in sync on reopen. Numeric attributes only. |
-| **Chart Type** | `line` | `line`, `bar` or `scatter`. Per-metric � different metrics in the same chart can render differently. |
-| **Nickname** | *(empty)* | Optional human-friendly label. When set: (a) it becomes the legend label instead of the attribute title, and (b) it acts as the per-chart unique series identifier � letting you pick the **same attribute** more than once in a chart and tell the values apart (e.g. one with refinement file A, another with refinement file B). |
+| **Chart Type** | `line` | `line`, `bar` or `scatter`. Per-metric - different metrics in the same chart can render differently. |
+| **Nickname** | *(empty)* | Optional human-friendly label. When set: (a) it becomes the legend label instead of the attribute title, and (b) it acts as the per-chart unique series identifier - letting you pick the **same attribute** more than once in a chart and tell the values apart (e.g. one with refinement file A, another with refinement file B). |
 | **Coverage Hierarchy** *(Coverage Level only)* | *(empty)* | Hierarchy path inside the coverage model. Empty = no hierarchy filter (server-default scope). |
 | **Verification Scope** *(Coverage Level only)* | *(empty)* | Verification scope filter forwarded to `/rest/metrics/get`. **See important grouping note below.** |
 | **Refinement Files** *(Coverage and vPlan)* | *(empty list)* | Repeatable list of full filesystem paths to vManager refinement files. **See important grouping note below.** |
@@ -243,24 +243,24 @@ written to the build log:
 [vManager Charts] [<chart title>] '<metric>' (<level>) skipped (no sessions or no id) = 0
 ```
 
-Charts will still render � the missing builds simply show `0`.
+Charts will still render - the missing builds simply show `0`.
 
 #### Validation rules (enforced inline on the form)
 
-- **vManager Server URL** � must start `https://`.
+- **vManager Server URL** - must start `https://`.
   Empty or malformed: red outline, inline error, **Save is blocked** while
   you stay on the page.
-- **Attribute Name** � required. The form pings vManager when you change
+- **Attribute Name** - required. The form pings vManager when you change
   the attribute, server URL or credentials, and surfaces server-side errors
   inline (auth, 404, TLS, connection refused, ...).
 - **Nickname**:
   - Must be **unique within a chart** when set.
   - **Becomes mandatory** when the **same attribute** is picked more than
-    once in the chart � every duplicate occurrence must carry its own
+    once in the chart - every duplicate occurrence must carry its own
     nickname so the chart can tell them apart. The form turns the offending
     nickname inputs red and blocks Save until each duplicate has a
     nickname.
-- **Maximum builds** � non-negative integer; `0` is allowed but produces a
+- **Maximum builds** - non-negative integer; `0` is allowed but produces a
   yellow warning that the chart will scan the entire job history.
 
 ## Usage
@@ -274,7 +274,7 @@ Charts will still render � the missing builds simply show `0`.
    2. Enter the **vManager Server URL** and pick **Credentials**.
    3. Choose your **Session source**.
    4. Click **Add Custom Chart**, fill **Chart Title** and **Maximum builds**.
-   5. (Optional) Pick a **vPlan Type** and **vPlan** � required only if any
+   5. (Optional) Pick a **vPlan Type** and **vPlan** - required only if any
       metric on this chart will be **vPlan Level**.
    6. Click **Add Metric** for each series, fill in the fields above.
 5. **Save**.
@@ -284,7 +284,7 @@ Charts will still render � the missing builds simply show `0`.
 7. Open the job page and click **vManager Charts** in the left sidebar.
 
 The first time you open the page after enabling custom metrics, only the
-builds run **after** that moment will have custom values � historical
+builds run **after** that moment will have custom values - historical
 builds simply show `0` for the new metrics.
 
 ### Build log
@@ -315,7 +315,7 @@ Turn it back off once you're done to keep the console clean.
 The same diagnostic traces are also emitted through Jenkins'
 `java.util.logging` system, under the logger
 `org.jenkinsci.plugins.vmanager.charts`, at level `FINE`. They are hidden
-by default � enable them via a Log Recorder:
+by default - enable them via a Log Recorder:
 
 1. **Manage Jenkins ? System Log** (under *Status Information*).
 2. **Add new log recorder** ? name it e.g. `vManager Charts` ? **Create**.
@@ -336,9 +336,9 @@ Configure page and **Enabled** is ticked.
 
 **Custom charts are empty / all zeros.**
 - Confirm the build log has `[vManager Charts]` lines. If not, the
-  `RunListener` didn't run � check that the property is enabled and that
+  `RunListener` didn't run - check that the property is enabled and that
   **Show Custom Metrics** is on.
-- Check the build log for `WARNING` lines from `[vManager Charts]` � they
+- Check the build log for `WARNING` lines from `[vManager Charts]` - they
   contain the underlying vAPI error.
 - Verify **Session source**: with the *vManager Plugin* option, the build
   must have actually launched a vManager session. With the *Input file*
@@ -352,7 +352,7 @@ when the attribute is duplicated within a chart.
 
 **Refinement files / verification scope on a metric look ignored.**
 This is expected when another metric in the **same chart** uses the
-**same hierarchy** � only the first metric's scope and refinement-file
+**same hierarchy** - only the first metric's scope and refinement-file
 list are sent (see the batching note above). Give each one a different
 hierarchy, or move them into separate charts.
 
@@ -370,10 +370,10 @@ field's red inline error will also tell you).
 
 Under **Charts configuration** the job offers two radio options:
 
-- **GUI (configure charts below)** *(default)* � the chart selection and
+- **GUI (configure charts below)** *(default)* - the chart selection and
   Custom Chart definitions come from the wizard on the same page (this is
   what the rest of this README describes).
-- **JSON file from workspace** � at build completion the plugin loads a
+- **JSON file from workspace** - at build completion the plugin loads a
   JSON file from the build's workspace and uses it to replace the entire
   chart configuration for that build. The path is taken from the
   **Config JSON File** field; when blank, the plugin looks for
@@ -403,7 +403,7 @@ browser as `vmanager-charts-config.json`. The export intentionally **omits**:
 - `verboseLogging`
 - `configSource` / `configFilePath`
 
-�so the exported file is safe to commit to source control and to share
+- so the exported file is safe to commit to source control and to share
 across jobs / Jenkins instances.
 
 ### JSON structure
@@ -487,7 +487,7 @@ For issues and feature requests, please use the project's issue tracker.
 - New **Export configuration to JSON** button that downloads the current
   GUI configuration as `vmanager-charts-config.json`, omitting
   credentials, server URL, session source and the verbose-logging flag.
-- New **Verbose build logging** checkbox � by default the per-build
+- New **Verbose build logging** checkbox - by default the per-build
   console only shows WARNING / error lines from the plugin. Turn this on
   to see every REST URL, payload and per-session listing.
 - System-log diagnostics demoted from `INFO` to `FINE`; enable via a Log
