@@ -44,7 +44,9 @@ public final class JsonConfigLoader {
         root.put("showRegressionOptimizationChart", p.isShowRegressionOptimizationChart());
         root.put("showBuildDuration",               p.isShowBuildDuration());
         root.put("showSuccessRate",                 p.isShowSuccessRate());
-        root.put("showTestResults",                 p.isShowTestResults());
+        // showTestResults (Regression Anomaly Detection Summary) is
+        // feature-flagged off in the UI; do not export it until the
+        // feature ships. The Java field is preserved for future use.
         root.put("showCustomMetrics",               p.isShowCustomMetrics());
 
         JSONArray charts = new JSONArray();
@@ -117,7 +119,9 @@ public final class JsonConfigLoader {
         p.setShowRegressionOptimizationChart(root.optBoolean("showRegressionOptimizationChart", false));
         p.setShowBuildDuration(root.optBoolean("showBuildDuration", false));
         p.setShowSuccessRate(root.optBoolean("showSuccessRate", false));
-        p.setShowTestResults(root.optBoolean("showTestResults", false));
+        // showTestResults is feature-flagged off; force false regardless
+        // of what an older JSON file may contain.
+        p.setShowTestResults(false);
         p.setShowCustomMetrics(root.optBoolean("showCustomMetrics", false));
 
         // configSource / configFilePath are deliberately NOT carried over: when a

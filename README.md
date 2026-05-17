@@ -32,10 +32,17 @@ automatically.
   left sidebar; rendering uses the
   [ECharts API plugin](https://plugins.jenkins.io/echarts-api/) for zoom,
   tooltips and PNG export.
+- **Build-level charts** — a separate **vManager Charts** link is also added
+  to every individual build's sidebar. These charts are populated per build
+  (not aggregated across the job) and currently include the **Runs Duration
+  Chart**, which renders a distribution of the build's runs by start time
+  (X axis) and run duration (Y axis), so you can spot if there's any
+  potential for faster turn-around time for the overall regression.
 - **Built-in trend charts** (no Verisium Manager server required):
   - Build Duration (line)
   - Success/Failure Rate (stacked bar)
-  - Test Results pass/fail/skip (stacked bar, requires the JUnit plugin)
+  - Regression Anomaly Detection Summary — pass/fail/skip from JUnit results
+    (stacked bar, requires the JUnit plugin).
 - **Custom Metrics charts** sourced from Verisium Manager vAPI:
   - **Session Level** — sums any numeric session attribute across the build's
     sessions (one POST to `/rest/sessions/list` per chart).
@@ -44,6 +51,15 @@ automatically.
   - **Coverage Level** — sums any numeric coverage attribute under an optional
     coverage hierarchy + verification scope (one POST to `/rest/metrics/get`
     per hierarchy).
+- **Two configuration sources** — *GUI (wizard)* or **JSON file from
+  workspace** loaded at build time. Pick the workspace path for fully
+  data-driven, per-build chart definitions; see
+  [Configuration source](#configuration-source-gui-vs-json-file).
+- **Export configuration to JSON** — one-click export of the current GUI
+  configuration to a JSON file you can check into source control,
+  hand-edit and later drop into a build's workspace as the JSON config
+  source. Credentials, server URL and session source are intentionally
+  *not* exported.
 - **Per-metric chart type**: `line`, `bar` or `scatter`.
 - **Multiple charts per job**, each with its own title, max-builds window and
   list of metrics.
@@ -52,6 +68,20 @@ automatically.
 - **Refinement files** for Coverage / vPlan attribute resolution.
 - **Live form validation** — every server-dependant field pings vManager and
   shows red inline errors on the spot (auth/404/TLS/connection failures, etc.).
+- **Verbose build logging toggle** — by default the per-build console is
+  quiet (only WARNING / error lines from the plugin are printed). Tick
+  **Verbose build logging** on the job to get every REST URL, request
+  header, payload, response routing OID and per-session listing on the
+  build's console while reproducing an issue.
+- **System-log diagnostics at `FINE`** — the same trace lines are also
+  emitted to Jenkins' system log via `java.util.logging` at `FINE` level
+  under the package `org.jenkinsci.plugins.vmanager.charts`. They are
+  hidden by default; enable them via a Log Recorder (see
+  [System log diagnostics](#system-log-diagnostics)).
+- **REST de-duplication** — attribute lists (per entity type) and the vPlan
+  list are fetched at most once per configuration page load and reused
+  across every combobox row, regardless of how many charts / metrics you
+  have configured.
 - **Pipeline-friendly** — the job property is configured via the standard
   Jenkins Configure UI; no DSL step is required.
 
@@ -99,20 +129,36 @@ All configuration lives in the job's **Configure** page, under the
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| **Enabled** | `true` | Master on/off switch for this job. When unchecked the **vManager Charts** sidebar link is hidden and no per-build metric collection runs. |
-| **Show Build Duration** | `true` | Show the built-in line chart of build duration. |
-| **Show Success Rate** | `true` | Show the built-in stacked bar of build outcomes. |
-| **Show Test Results** | `true` | Show the built-in stacked bar of pass/fail/skip from JUnit results. |
-| **Maximum builds** | `50` | How many of the most-recent builds the **built-in** charts plot. `0` = no limit (slow on long histories — a yellow warning is shown). |
-| **Show Custom Metrics** | `false` | Reveals the Verisium Manager connection settings and the **Custom Charts** repeatable list below. |
+| **Enable vManager Charts** | `false` | Master on/off switch for this job. When unchecked the **vManager Charts** sidebar link is hidden and no per-build metric collection runs. |
+| **vManager Server URL** | *(empty)* | **Required** when *Enable* is on. See [Verisium Manager connection](#verisium-manager-connection-when-show-custom-metrics-is-on) below. |
+| **Credentials** | *(empty)* | **Required** when *Enable* is on. Standard Jenkins username/password credentials. |
+| **vManager Session** | *Leverage vManager Jenkins Plugin Information* | See [Session source](#session-source). Always taken from the GUI — never from a JSON config file. |
+| **Configuration source** | `GUI (configure charts below)` | Radio. Choose **GUI** to define charts via the wizard below, or **JSON file from workspace** to load the entire chart configuration from a workspace JSON file at build completion. See [Configuration source](#configuration-source-gui-vs-json-file). |
+| **Verbose build logging** | `false` | When on, every `[vManager Charts]` diagnostic line (REST URLs, request headers, payloads, response routing OIDs, per-session listings, summary counters, etc.) is printed to the build's console. When off, only WARNING and error lines appear. Always taken from the GUI — never from a JSON config file. |
 
-### Verisium Manager connection (when *Show Custom Metrics* is on)
+The checkboxes below are shown only when **Configuration source = GUI**:
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| **Build Level Charts** | `false` | Master switch for the *per-build* charts. When on, a **vManager Charts** link is also added to every build's sidebar. Expands the sub-options below. |
+| &nbsp;&nbsp;&nbsp;&nbsp;**Runs Duration Chart** | `false` | Distribution of the build's runs by start time (X axis) and run duration (Y axis). |
+| **Build Duration Chart** | `false` | Show the built-in line chart of build duration. |
+| **Success/Failure Rate Chart** | `false` | Show the built-in stacked bar of build outcomes. |
+| **Regression Anomaly Detection Summary** | `false` | Show the built-in stacked bar of pass/fail/skip from JUnit results. |
+| **Maximum builds** | `50` | How many of the most-recent builds the **built-in** charts plot. `0` = no limit (slow on long histories — a yellow warning is shown). |
+| **Show Custom Metrics** | `false` | Reveals the **Custom Charts** repeatable list below. |
+
+### Verisium Manager connection
 
 | Field | Default | Behaviour when empty |
 |-------|---------|----------------------|
-| **vManager Server URL** | *(empty)* | **Required.** Must start with `http://` or `https://`. Leaving it blank or malformed turns the field red and blocks Save without leaving the page. |
+| **vManager Server URL** | *(empty)* | **Required.** Must start with `http://` or `https://`. Leaving it blank or malformed turns the field red and blocks Save without leaving the page. Example: `https://host:port/vmgr/vapi`. |
 | **Credentials** | *(empty)* | **Required.** Standard Jenkins username/password credentials used as HTTP Basic auth against vManager. |
 | **vManager Schema** | `latest` | Used when building the REST URLs (`/rest/$schema/...`). Leaving it blank falls back to `latest`. |
+
+*Server URL, credentials, the session source and the verbose-logging flag
+are always taken from the GUI, even when the **Configuration source** is
+set to **JSON file from workspace**.*
 
 #### Session source
 
@@ -121,12 +167,12 @@ custom-metric REST call.
 
 | Option | Behaviour |
 |--------|-----------|
-| **Leverage vManager Jenkins Plugin Information** *(default)* | Read the sessions associated with this build by the [Cadence vManager Plugin](https://plugins.jenkins.io/vmanager-plugin). No extra setup needed if you are already using that plugin. |
+| **Leverage vManager Jenkins Plugin Information** *(default)* | Read the sessions associated with this build by the [Cadence vManager Plugin](https://plugins.jenkins.io/vmanager-plugin). If you are using *collect* mode no plugin change is required; if you are using *launch* mode you must upgrade to the latest version of the vManager Plugin so it can create the `BUILD_ID.BUILD_VERSION.sessions.input` file in the workspace. |
 | **Input file name** | Read session names from a text file (one session name per line). Path is taken from **Input file path** below. |
 
 | Field | Default | Behaviour when empty |
 |-------|---------|----------------------|
-| **Input file path** *(only when source = Input file)* | *(empty)* | When blank, the plugin looks in the build's workspace for `${BUILD_NUMBER}.${BUILD_ID}.sessions.input`. Set this only if you want a fixed path that is consistent across builds. |
+| **Input file path** *(only when source = Input file)* | *(empty)* | When blank, the plugin looks in the build's workspace for `BUILD_ID.BUILD_VERSION.sessions.input`. Set this only if you want a fixed path that is consistent across builds. |
 
 If a build has **no sessions** (file missing, file empty, vManager Plugin
 didn't record any), every custom metric for that build is recorded as `0`
@@ -241,17 +287,44 @@ builds simply show `0` for the new metrics.
 
 ### Build log
 
-Every metric collection writes a single line per metric, prefixed with
-`[vManager Charts]`, e.g.:
+By default the per-build console only shows **WARNING** and **error** lines
+from the plugin. Server-side failures are logged at `WARNING` and recorded
+as `0` for the build so the chart still renders.
+
+When reproducing an issue, tick **Verbose build logging** on the job
+configuration to also print every chatty `[vManager Charts]` trace line
+to the build's console (REST URLs, request headers, payloads, response
+routing OIDs, per-session listings and the per-metric summary line, e.g.):
 
 ```
+[vManager Charts] Configuration source: GUI (job configuration page).
+[vManager Charts] sessions input file: .../42.42.sessions.input (1 session)
+[vManager Charts]   session: vmgr.israel.linux64.x86_64.agile_mdv.051226
+[vManager Charts] POST https://host:port/vmgr/vapi/rest/sessions/list
+[vManager Charts]   payload: { ... }
 [vManager Charts] [Coverage Closure] 'Expression Hit' (COVERAGE_LEVEL id='CoverageAttributes.EXPRESSION_HIT' hierarchy='top.uart' scope='cover' refinement=2) = 87.43
 [vManager Charts] [Session KPIs] 'Passed' (SESSION_LEVEL id='SessionAttributes.PASSED_RUNS' sessions=3) = 412
 ```
 
-Use these to confirm that the right entity, attribute and refinement files
-are being sent. Server-side failures are logged at `WARNING` and recorded
-as `0` for the build so the chart still renders.
+Turn it back off once you're done to keep the console clean.
+
+### System log diagnostics
+
+The same diagnostic traces are also emitted through Jenkins'
+`java.util.logging` system, under the logger
+`org.jenkinsci.plugins.vmanager.charts`, at level `FINE`. They are hidden
+by default — enable them via a Log Recorder:
+
+1. **Manage Jenkins → System Log** (under *Status Information*).
+2. **Add new log recorder** → name it e.g. `vManager Charts` → **Create**.
+3. Under *Loggers*, click **Add** and enter:
+   - **Logger**: `org.jenkinsci.plugins.vmanager.charts`
+   - **Log level**: `FINE` (or `FINEST` for maximum detail)
+4. **Save**, then open the recorder and click **Log records**.
+
+The recorder is global (visible to all Jenkins users); the per-job
+**Verbose build logging** checkbox above controls only the per-build
+console and is opt-in per job.
 
 ## Troubleshooting
 
@@ -291,6 +364,94 @@ field's red inline error will also tell you).
   is installed and enabled.
 - Open the browser console; missing JS dependencies show up there.
 
+## Configuration source: GUI vs JSON file
+
+Under **Charts configuration** the job offers two radio options:
+
+- **GUI (configure charts below)** *(default)* — the chart selection and
+  Custom Chart definitions come from the wizard on the same page (this is
+  what the rest of this README describes).
+- **JSON file from workspace** — at build completion the plugin loads a
+  JSON file from the build's workspace and uses it to replace the entire
+  chart configuration for that build. The path is taken from the
+  **Config JSON File** field; when blank, the plugin looks for
+  `vmanager-charts.config.json` in the build's workspace.
+
+Even when **JSON file from workspace** is selected, the following continue
+to come from the GUI (and **must** be filled in on the GUI):
+
+- **vManager Server URL**
+- **Credentials**
+- **vManager Session** (source + input-file path)
+- **Verbose build logging**
+
+If the JSON file is missing, unreadable, or contains `"enabled": false`,
+the build is recorded with a single warning line and no charts are
+populated for that build.
+
+### Export configuration to JSON
+
+The **Charts configuration** section contains an **Export configuration to
+JSON** button. Clicking it serializes the current GUI configuration to the
+browser as `vmanager-charts.config.json`. The export intentionally **omits**:
+
+- `credentialsId`
+- `serverUrl`
+- `sessionSource` / `sessionInputFile`
+- `verboseLogging`
+- `configSource` / `configFilePath`
+
+…so the exported file is safe to commit to source control and to share
+across jobs / Jenkins instances.
+
+### JSON structure
+
+The loader accepts the JSON shape produced by the exporter; any field may
+be omitted (defaults are applied). Top-level keys:
+
+```jsonc
+{
+  "enabled":                         true,
+  "vManagerSchema":                  "latest",
+  "maxBuilds":                       50,
+
+  // Built-in charts — all default to false
+  "showBuildLevelCharts":            true,
+  "showRegressionOptimizationChart": true,
+  "showBuildDuration":               true,
+  "showSuccessRate":                 false,
+
+  // Custom charts list
+  "showCustomMetrics":               true,
+  "customCharts": [
+    {
+      "title":     "Coverage Closure",
+      "vPlanType": "DB",          // "", "DB" or "FILE"
+      "vPlanPath": "my_vplan",   // vPlan name (DB) or absolute path (FILE)
+      "maxBuilds": 50,
+      "metrics": [
+        {
+          "entityType":         "COVERAGE_LEVEL",     // SESSION_LEVEL | VPLAN_LEVEL | COVERAGE_LEVEL
+          "attributeName":      "Expression Hit (CoverageAttributes.EXPRESSION_HIT)",
+          "chartType":          "line",               // line | bar | scatter
+          "nickname":           "uart-cover",         // unique within chart; required when an attribute is repeated
+          "hierarchyPath":      "",                  // VPLAN_LEVEL only
+          "coverageHierarchy":  "top.uart",          // COVERAGE_LEVEL only
+          "verificationScope":  "cover",             // COVERAGE_LEVEL only
+          "refinementFiles":      [{"path": "/abs/refine.refine"}],
+          "vplanRefinementFiles": [{"path": "/abs/vplan_refine.refine"}]
+        }
+      ]
+    }
+  ]
+}
+```
+
+The following fields, even if present in a hand-edited file, are
+**always ignored** on load (they come from the GUI): `credentialsId`,
+`serverUrl`, `sessionSource`, `sessionInputFile`, `verboseLogging`,
+`configSource`, `configFilePath`.
+
 ## Building from source
 
 ```powershell
@@ -309,6 +470,32 @@ This plugin follows the standard Jenkins project licensing.
 For issues and feature requests, please use the project's issue tracker.
 
 ## Change Log
+
+### 1.1
+
+- Renamed **Test Results** built-in chart to **Regression Anomaly Detection
+  Summary**.
+- New **Build Level Charts** section with the **Runs Duration Chart**
+  (per-build distribution of runs by start time and duration); accessed
+  via the **vManager Charts** link added to every build's sidebar.
+- New **Configuration source** radio: choose between *GUI* and *JSON file
+  from workspace*. JSON file fully replaces the chart selection at build
+  time; Server URL, credentials, session source and verbose-logging flag
+  stay in the GUI.
+- New **Export configuration to JSON** button that downloads the current
+  GUI configuration as `vmanager-charts.config.json`, omitting
+  credentials, server URL, session source and the verbose-logging flag.
+- New **Verbose build logging** checkbox — by default the per-build
+  console only shows WARNING / error lines from the plugin. Turn this on
+  to see every REST URL, payload and per-session listing.
+- System-log diagnostics demoted from `INFO` to `FINE`; enable via a Log
+  Recorder on logger `org.jenkinsci.plugins.vmanager.charts` at `FINE`.
+- All built-in chart checkboxes (Build Duration, Success/Failure Rate,
+  Regression Anomaly Detection Summary) now default to **off** so a newly
+  enabled job starts with a clean configuration.
+- REST de-duplication: attribute lists per entity type and the vPlan list
+  are fetched at most once per configuration page load and reused across
+  every combobox row.
 
 ### 1.0 (initial release)
 

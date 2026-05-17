@@ -219,10 +219,16 @@
                      field="showSuccessRate">
                 <f:checkbox name="showSuccessRate" checked="${instance != null and instance.showSuccessRate}"/>
             </f:entry>
-            <f:entry title="Regression Anomaly Detection Summary"
-                     field="showTestResults">
-                <f:checkbox name="showTestResults" checked="${instance != null and instance.showTestResults}"/>
-            </f:entry>
+            <!-- Hidden for now: feature not yet implemented. Flip the
+                 j:if test to ${true} (or remove it) to re-enable. The
+                 underlying showTestResults field, getter/setter and JSON
+                 key are kept intact so saved configs survive. -->
+            <j:if test="${false}">
+                <f:entry title="Regression Anomaly Detection Summary"
+                         field="showTestResults">
+                    <f:checkbox name="showTestResults" checked="${instance != null and instance.showTestResults}"/>
+                </f:entry>
+            </j:if>
             <f:optionalBlock name="showCustomMetrics"
                              title="Custom Charts"
                              checked="${instance != null and instance.showCustomMetrics}"
