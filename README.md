@@ -35,7 +35,7 @@ automatically.
 - **Build-level charts** - a separate **vManager Charts** link is also added
   to every individual build's sidebar. These charts are populated per build
   (not aggregated across the job) and currently include the **Runs Duration
-  Chart**, which renders a distribution of the build's runs by start time
+  Chart**, which renders a distribution of the build's runs (only passed runs) by start time
   (X axis) and run duration (Y axis), so you can spot if there's any
   potential for faster turn-around time for the overall regression.
 - **Build Duration Chart** - line chart showing each build's wall-clock

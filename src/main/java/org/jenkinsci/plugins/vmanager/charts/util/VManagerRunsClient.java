@@ -34,16 +34,22 @@ public final class VManagerRunsClient {
     /**
      * Single run point: holds both {@code timeToStartMinutes} and
      * {@code timeToEndMinutes} (elapsed minutes from the session's start to
-     * the run's start / end respectively) and the run {@code durationMinutes}.
+     * the run's start / end respectively), the run {@code durationMinutes}
+     * and the vManager-reported {@code estimatedDurationMinutes} (the value
+     * of the {@code estimated_duration_vmgr} attribute, converted from
+     * seconds to minutes).
      */
     public static final class RunPoint {
         public final double timeToStartMinutes;
         public final double timeToEndMinutes;
         public final double durationMinutes;
-        RunPoint(double timeToStartMinutes, double timeToEndMinutes, double durationMinutes) {
-            this.timeToStartMinutes = timeToStartMinutes;
-            this.timeToEndMinutes   = timeToEndMinutes;
-            this.durationMinutes    = durationMinutes;
+        public final double estimatedDurationMinutes;
+        RunPoint(double timeToStartMinutes, double timeToEndMinutes,
+                 double durationMinutes, double estimatedDurationMinutes) {
+            this.timeToStartMinutes       = timeToStartMinutes;
+            this.timeToEndMinutes         = timeToEndMinutes;
+            this.durationMinutes          = durationMinutes;
+            this.estimatedDurationMinutes = estimatedDurationMinutes;
         }
     }
 
@@ -183,13 +189,28 @@ public final class VManagerRunsClient {
             relationFilter.put("@c",           ".RelationFilter");
             relationFilter.put("relationName", "session");
             relationFilter.put("filter",       attValueFilter);
+            chain.add(relationFilter);
 
+            //Make sure you are not taking into account null duration
+            relationFilter = new JSONObject();
+            relationFilter.put("@c",           ".AttValueFilter");
+            relationFilter.put("attName", "duration");
+            relationFilter.put("attValue",       "0");
+            relationFilter.put("operand",  "GREATER_OR_EQUALS_TO");
+            chain.add(relationFilter);
+
+            //Only passed runs
+            relationFilter = new JSONObject();
+            relationFilter.put("@c",           ".AttValueFilter");
+            relationFilter.put("attName", "status");
+            relationFilter.put("attValue",       "passed");
+            relationFilter.put("operand",  "EQUALS");
             chain.add(relationFilter);
         }
 
         JSONObject filter = new JSONObject();
         filter.put("@c",        ".ChainedFilter");
-        filter.put("condition", "OR");
+        filter.put("condition", "AND");
         filter.put("chain",     chain);
 
         // ── sortSpec: duration ASCENDING ──
@@ -199,11 +220,12 @@ public final class VManagerRunsClient {
         sort.put("direction", "ASCENDING");
         sortSpec.add(sort);
 
-        // ── projection: SELECTION_ONLY [duration, start_time, end_time] ──
+        // ── projection: SELECTION_ONLY [duration, start_time, end_time, estimated_duration_vmgr] ──
         JSONArray selection = new JSONArray();
         selection.add("duration");
         selection.add("start_time");
         selection.add("end_time");
+        selection.add("estimated_duration_vmgr");
 
         JSONObject projection = new JSONObject();
         projection.put("type",      "SELECTION_ONLY");
@@ -242,13 +264,15 @@ public final class VManagerRunsClient {
             Object e = rows.get(i);
             if (!(e instanceof JSONObject)) continue;
             JSONObject row = (JSONObject) e;
-            double durationMinutes    = optDouble(row, "duration") / 60.0;            // sec → min
-            double startTimeMs        = optDouble(row, "start_time");
-            double endTimeMs          = optDouble(row, "end_time");
+            double durationMinutes        = optDouble(row, "duration") / 60.0;                    // sec → min
+            double estimatedDurationMinutes = optDouble(row, "estimated_duration_vmgr") / 60.0;     // sec → min
+            double startTimeMs            = optDouble(row, "start_time");
+            double endTimeMs              = optDouble(row, "end_time");
             // Time elapsed from session start to this run's start / end (ms → min).
-            double timeToStartMinutes = (startTimeMs - sessionStartMillis) / 60000.0;
-            double timeToEndMinutes   = (endTimeMs   - sessionStartMillis) / 60000.0;
-            out.add(new RunPoint(timeToStartMinutes, timeToEndMinutes, durationMinutes));
+            double timeToStartMinutes     = (startTimeMs - sessionStartMillis) / 60000.0;
+            double timeToEndMinutes       = (endTimeMs   - sessionStartMillis) / 60000.0;
+            out.add(new RunPoint(timeToStartMinutes, timeToEndMinutes,
+                                 durationMinutes, estimatedDurationMinutes));
         }
         return out;
     }

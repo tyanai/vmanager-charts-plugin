@@ -4,9 +4,15 @@
             tooltip: {
                 trigger: 'item',
                 formatter: function (p) {
-                    return p.seriesName
+                    var html = p.seriesName
                         + '<br/>' + xLabel + ': ' + p.value[0].toFixed(2) + ' min'
                         + '<br/>Duration: ' + p.value[1].toFixed(2) + ' min';
+                    // value[2] = estimated_duration_vmgr in minutes; absent
+                    // (undefined) for builds saved before this field was added.
+                    if (p.value.length > 2 && typeof p.value[2] === 'number') {
+                        html += '<br/>Estimated Duration: ' + p.value[2].toFixed(2) + ' min';
+                    }
+                    return html;
                 }
             },
             legend: {

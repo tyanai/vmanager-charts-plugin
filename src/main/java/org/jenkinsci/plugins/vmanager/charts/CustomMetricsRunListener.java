@@ -237,8 +237,11 @@ public class CustomMetricsRunListener extends RunListener<Run<?, ?>> {
                     int mediumBound = third + third;
                     for (int i = 0; i < n; i++) {
                         VManagerRunsClient.RunPoint pt = points.get(i);
-                        double[] xyStart = new double[]{ pt.timeToStartMinutes, pt.durationMinutes };
-                        double[] xyEnd   = new double[]{ pt.timeToEndMinutes,   pt.durationMinutes };
+                        // Third element carries the vManager "estimated_duration_vmgr"
+                        // (already converted to minutes); it is not plotted on the axes,
+                        // only shown in the tooltip.
+                        double[] xyStart = new double[]{ pt.timeToStartMinutes, pt.durationMinutes, pt.estimatedDurationMinutes };
+                        double[] xyEnd   = new double[]{ pt.timeToEndMinutes,   pt.durationMinutes, pt.estimatedDurationMinutes };
                         if (i < smallBound) {
                             small.add(xyStart);
                             smallEnd.add(xyEnd);
