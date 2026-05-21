@@ -338,7 +338,7 @@ public final class VManagerSessionsClient {
      * <pre>
      *   total_runs_in_session   &gt; real_max_runs_in_parallel_vmgr
      *   AND
-     *   max_runs_in_parallel    &gt; real_max_runs_in_parallel_vmgr
+     *   max_runs_in_parallel    &gt; 1.25 * real_max_runs_in_parallel_vmgr
      * </pre>
      */
     public static java.util.Map<String, String> fetchSessionTatWarnings(
@@ -401,10 +401,10 @@ public final class VManagerSessionsClient {
             Double max   = optDouble(row, "max_runs_in_parallel");
             if (total == null || real == null || max == null) continue;
 
-            if (total > real && max > real) {
+            if (total > real && max > 1.25 * real) {
                 out.put(name,
                         "Session might not be configured for maximum TAT. "
-                                + "The actual number of parallel runs is lower than the maximum setting.");
+                                + "The actual number of parallel runs is more than 25% lower than the maximum configured setting.");
             }
         }
         if (listener != null && BuildLog.isVerbose()) {

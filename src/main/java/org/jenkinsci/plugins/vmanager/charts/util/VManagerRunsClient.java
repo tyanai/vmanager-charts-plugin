@@ -181,37 +181,42 @@ public final class VManagerRunsClient {
 
         // ── filter: ChainedFilter(OR) of one RelationFilter per session ──
         JSONArray chain = new JSONArray();
+        
+
+        JSONObject relationFilter = new JSONObject();
+        relationFilter.put("@c",           ".RelationFilter");
+        relationFilter.put("relationName", "session");
+
+        JSONArray sessionValues = new JSONArray();
         for (String session : sessionNames) {
             if (session == null || session.isBlank()) continue;
-
-            JSONObject attValueFilter = new JSONObject();
-            attValueFilter.put("@c",       ".AttValueFilter");
-            attValueFilter.put("attName",  "session_name");
-            attValueFilter.put("attValue", session);
-            attValueFilter.put("operand",  "EQUALS");
-
-            JSONObject relationFilter = new JSONObject();
-            relationFilter.put("@c",           ".RelationFilter");
-            relationFilter.put("relationName", "session");
-            relationFilter.put("filter",       attValueFilter);
-            chain.add(relationFilter);
-
-            //Make sure you are not taking into account null duration
-            relationFilter = new JSONObject();
-            relationFilter.put("@c",           ".AttValueFilter");
-            relationFilter.put("attName", "duration");
-            relationFilter.put("attValue",       "0");
-            relationFilter.put("operand",  "GREATER_OR_EQUALS_TO");
-            chain.add(relationFilter);
-
-            //Only passed runs
-            relationFilter = new JSONObject();
-            relationFilter.put("@c",           ".AttValueFilter");
-            relationFilter.put("attName", "status");
-            relationFilter.put("attValue",       "passed");
-            relationFilter.put("operand",  "EQUALS");
-            chain.add(relationFilter);
+            sessionValues.add(session);
         }
+
+        JSONObject inFilter = new JSONObject();
+        inFilter.put("@c",           ".InFilter");
+        inFilter.put("attName",       "name");
+        inFilter.put("operand",       "IN");
+        inFilter.put("values",        sessionValues);
+        relationFilter.put("filter",  inFilter);
+        chain.add(relationFilter);
+
+        //Make sure you are not taking into account null duration
+        relationFilter = new JSONObject();
+        relationFilter.put("@c",           ".AttValueFilter");
+        relationFilter.put("attName", "duration");
+        relationFilter.put("attValue",       "0");
+        relationFilter.put("operand",  "GREATER_OR_EQUALS_TO");
+        chain.add(relationFilter);
+
+        //Only passed runs
+        relationFilter = new JSONObject();
+        relationFilter.put("@c",           ".AttValueFilter");
+        relationFilter.put("attName", "status");
+        relationFilter.put("attValue",       "passed");
+        relationFilter.put("operand",  "EQUALS");
+        chain.add(relationFilter);
+        
 
         JSONObject filter = new JSONObject();
         filter.put("@c",        ".ChainedFilter");

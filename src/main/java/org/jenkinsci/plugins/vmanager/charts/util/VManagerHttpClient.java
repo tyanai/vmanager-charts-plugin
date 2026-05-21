@@ -43,6 +43,7 @@ import java.util.Map;
 public final class VManagerHttpClient {
 
     public static final int TIMEOUT_MS = 60_000;
+    public static final int READ_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
 
     private VManagerHttpClient() {
         // utility class
@@ -104,7 +105,7 @@ public final class VManagerHttpClient {
                                  StandardUsernamePasswordCredentials creds) throws IOException {
         HttpURLConnection conn = openConnection(urlStr);
         conn.setConnectTimeout(TIMEOUT_MS);
-        conn.setReadTimeout(TIMEOUT_MS);
+        conn.setReadTimeout(READ_TIMEOUT_MS);
         conn.setRequestMethod("GET");
         conn.setRequestProperty("Accept",       "application/json, */*;q=0.8");
         conn.setRequestProperty("Content-Type", "application/json");
@@ -137,7 +138,7 @@ public final class VManagerHttpClient {
                                         Map<String, String> extraHeaders) throws IOException {
         HttpURLConnection conn = openConnection(urlStr);
         conn.setConnectTimeout(TIMEOUT_MS);
-        conn.setReadTimeout(TIMEOUT_MS);
+        conn.setReadTimeout(READ_TIMEOUT_MS);
         conn.setDoOutput(true);
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
