@@ -197,7 +197,7 @@ public class BuildChartAction implements Action {
         run.getParent().checkPermission(Item.CONFIGURE);
         String body = readBody(req, VManagerChartsLayoutStore.MAX_LAYOUT_BYTES);
         try {
-            Object parsed = JSONSerializer.toJSON(body == null ? "{}" : body);
+            Object parsed = JSONSerializer.toJSON(body);
             if (!(parsed instanceof JSONObject)) {
                 rsp.sendError(400, "layout must be a JSON object");
                 return;

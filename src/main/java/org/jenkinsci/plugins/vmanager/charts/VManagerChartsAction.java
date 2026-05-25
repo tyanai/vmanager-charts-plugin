@@ -396,7 +396,7 @@ public class VManagerChartsAction implements Action {
                 if (c <= 0) continue;
                 net.sf.json.JSONArray cell = new net.sf.json.JSONArray();
                 cell.add(xi);
-                cell.add(yi.intValue());
+                cell.add(yi);
                 cell.add(c);
                 cells.add(cell);
                 if (c > maxValue) maxValue = c;
@@ -480,7 +480,7 @@ public class VManagerChartsAction implements Action {
         // Reject anything that isn't a JSON object so callers can't dump
         // arbitrary text into the file.
         try {
-            Object parsed = JSONSerializer.toJSON(body == null ? "{}" : body);
+            Object parsed = JSONSerializer.toJSON(body);
             if (!(parsed instanceof JSONObject)) {
                 rsp.sendError(400, "layout must be a JSON object");
                 return;

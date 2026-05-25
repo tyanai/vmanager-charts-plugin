@@ -14,10 +14,12 @@ import hudson.util.ComboBoxModel;
 import hudson.util.FormValidation;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
+import org.jenkinsci.plugins.vmanager.charts.util.VManagerChartsUtil;
 import org.jenkinsci.plugins.vmanager.charts.util.VManagerHttpClient;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.verb.POST;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.ArrayList;
@@ -165,18 +167,27 @@ public class GroupedRunsChartDefinition extends AbstractDescribableImpl<GroupedR
             return "Grouped Runs Heatmap";
         }
 
-        public FormValidation doCheckTitle(@QueryParameter String value) {
+        @POST
+        public FormValidation doCheckTitle(@AncestorInPath Item item,
+                                           @QueryParameter String value) {
+            VManagerChartsUtil.checkDescriptorPermission(item);
             if (value == null || value.isBlank()) {
                 return FormValidation.error("Chart Title is required.");
             }
             return FormValidation.ok();
         }
 
-        public FormValidation doCheckYAxisLimit(@QueryParameter String value) {
+        @POST
+        public FormValidation doCheckYAxisLimit(@AncestorInPath Item item,
+                                                @QueryParameter String value) {
+            VManagerChartsUtil.checkDescriptorPermission(item);
             return positiveInt(value, "Y-axis limit");
         }
 
-        public FormValidation doCheckMaxBuilds(@QueryParameter String value) {
+        @POST
+        public FormValidation doCheckMaxBuilds(@AncestorInPath Item item,
+                                               @QueryParameter String value) {
+            VManagerChartsUtil.checkDescriptorPermission(item);
             return positiveInt(value, "Max builds");
         }
 
@@ -193,12 +204,14 @@ public class GroupedRunsChartDefinition extends AbstractDescribableImpl<GroupedR
             return FormValidation.ok();
         }
 
+        @POST
         public FormValidation doCheckGroupByAttribute(
                 @QueryParameter String value,
                 @RelativePath("..") @QueryParameter String serverUrl,
                 @RelativePath("..") @QueryParameter String credentialsId,
                 @AncestorInPath Item item) {
 
+            VManagerChartsUtil.checkDescriptorPermission(item);
             if (serverUrl != null && !serverUrl.isBlank()) {
                 String url = buildRunsListUrl(serverUrl);
                 try {
@@ -228,11 +241,13 @@ public class GroupedRunsChartDefinition extends AbstractDescribableImpl<GroupedR
          * {@code GroupedRunsChartDefinition} to see it. The full request
          * payload is empty (this is a GET), so only the URL is logged.
          */
+        @POST
         public ComboBoxModel doFillGroupByAttributeItems(
                 @RelativePath("..") @QueryParameter String serverUrl,
                 @RelativePath("..") @QueryParameter String credentialsId,
                 @AncestorInPath Item item) {
 
+            VManagerChartsUtil.checkDescriptorPermission(item);
             ComboBoxModel m = new ComboBoxModel();
             LOGGER.log(Level.INFO,
                     "[GroupedRuns] doFillGroupByAttributeItems called. serverUrl=''{0}'' credentialsId=''{1}'' item=''{2}''",

@@ -1,0 +1,110 @@
+/* ──────────────────────────────────────────────────────────────────────
+ * Custom popover menus used by GroupedRunsChartDefinition/assets.js.
+ *
+ *   .vmp-grouped-combo-menu : the Group-by attribute dropdown
+ *   .vmp-grouped-combo-item : an item row inside that dropdown
+ *   .vmp-grouped-combo-empty: the "Loading…" / "No matches" placeholder
+ *
+ *   .vmp-status-menu        : the Statuses multi-select popover
+ *   .vmp-status-menu-header : Select-all / Clear shortcut row
+ *   .vmp-status-menu-link   : the Select-all / Clear anchors
+ *   .vmp-status-menu-row    : one checkbox row per status
+ *
+ *   .vmp-status-filters-btn : the trigger button rendered by config.jelly
+ *
+ * All colors use the Jenkins theming CSS variables so the controls render
+ * correctly in both the default and dark themes.
+ * ────────────────────────────────────────────────────────────────────── */
+
+.vmp-grouped-combo-menu,
+.vmp-status-menu {
+    position: fixed;
+    z-index: 10050;
+    background: var(--card-background, #fff);
+    color: var(--text-color, #000);
+    border: 1px solid var(--card-border-color, #ccc);
+    border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    max-height: 320px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+    padding: 4px 0;
+    display: none;
+}
+
+.vmp-grouped-combo-menu {
+    min-width: 320px;
+}
+
+.vmp-status-menu {
+    min-width: 180px;
+}
+
+.vmp-grouped-combo-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vmp-grouped-combo-item:hover {
+    background: var(--item-background--hover, rgba(0, 0, 0, 0.06));
+}
+
+.vmp-grouped-combo-empty {
+    padding: 8px 12px;
+    color: var(--text-color-secondary, #888);
+}
+
+.vmp-status-menu-header {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 12px 6px;
+    border-bottom: 1px solid var(--card-border-color, #eee);
+    margin-bottom: 4px;
+}
+
+.vmp-status-menu-link {
+    font-size: 0.75rem;
+}
+
+.vmp-status-menu-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    cursor: pointer;
+}
+
+.vmp-status-menu-row:hover {
+    background: var(--item-background--hover, rgba(0, 0, 0, 0.06));
+}
+
+.vmp-status-filters-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    justify-content: space-between;
+    /* Match Jenkins' standard input metrics so the Statuses control lines
+       up with the textbox / combobox on the same row in both default and
+       dark themes. The exact CSS variables Jenkins exposes for input
+       sizing have shifted between releases, so we use literal values that
+       mirror the core defaults (padding 0.5rem 0.75rem, line-height 1.5,
+       font-size 0.875rem -> ~38px tall). */
+    min-height: 2.375rem;
+    padding: 0.5rem 0.75rem;
+    line-height: 1.5;
+    font-size: 0.875rem;
+    border: 1px solid var(--card-border-color, #ccc);
+    border-radius: 6px;
+    background: var(--input-background, var(--card-background, #fff));
+    color: var(--text-color, #000);
+    cursor: pointer;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}

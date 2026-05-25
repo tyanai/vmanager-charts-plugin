@@ -8,6 +8,7 @@
         Each child f:entry still renders the standard Jenkins markup; we
         only flex the wrapper so they share one row.
     -->
+    <st:adjunct includes="org.jenkinsci.plugins.vmanager.charts.util.vmpCombo"/>
     <st:adjunct includes="org.jenkinsci.plugins.vmanager.charts.model.MetricDefinition.assets"/>
     <div class="vmp-metric-row">
         <f:entry title="Entity Level"
@@ -16,8 +17,13 @@
         </f:entry>
         <f:entry title="Attribute *"
                  field="attributeName">
-            <f:combobox fillDependsOn="entityType ../../serverUrl ../../credentialsId"
-                        checkDependsOn="entityType ../../serverUrl ../../credentialsId"/>
+            <!-- Plain textbox driven by VmpCombo (assets.js). The fill
+                 endpoint URL is provided by the sibling hidden input so
+                 the JS does not have to construct descriptorByName URLs. -->
+            <f:textbox clazz="vmp-combo-attr"
+                       checkDependsOn="entityType ../../serverUrl ../../credentialsId"/>
+            <input type="hidden" class="vmp-fill-meta"
+                   data-fill-url="${descriptor.descriptorFullUrl}/fillAttributeNameItems"/>
         </f:entry>
         <f:entry title="Chart Type"
                  field="chartType">

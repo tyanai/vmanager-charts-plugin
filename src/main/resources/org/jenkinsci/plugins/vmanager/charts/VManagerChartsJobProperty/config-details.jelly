@@ -94,6 +94,14 @@
                     <f:checkbox name="showTestResults" checked="${instance != null and instance.showTestResults}"/>
                 </f:entry>
             </j:if>
+            <!-- Applies to the built-in charts above (Runs Duration / Build
+                 Duration / Success/Failure Rate). Custom Grouped Run's and
+                 Custom Charts have their own per-chart Max Builds field. -->
+            <f:entry title="Maximum builds (built-in charts) *"
+                     field="maxBuilds"
+                     help="${descriptor.getHelpFile('maxBuilds')}">
+                <f:number default="50" min="0" step="1"/>
+            </f:entry>
             <f:optionalBlock name="showGroupedRunsCharts"
                              title="Custom Grouped Run's Chart (Heatmap)"
                              help="${descriptor.getHelpFile('showGroupedRunsCharts')}"

@@ -4,7 +4,8 @@
 
 .chart-section {
     margin-bottom: 40px;
-    background: #fff;
+    background: var(--card-background, #fff);
+    color: var(--text-color);
     padding: 20px;
     border-radius: 4px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -13,7 +14,7 @@
 .chart-section h2 {
     margin-top: 0;
     margin-bottom: 20px;
-    color: #333;
+    color: var(--text-color);
     font-size: 18px;
     font-weight: 500;
 }

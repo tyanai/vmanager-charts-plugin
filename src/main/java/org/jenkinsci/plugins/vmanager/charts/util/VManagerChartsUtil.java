@@ -2,7 +2,9 @@ package org.jenkinsci.plugins.vmanager.charts.util;
 
 import hudson.FilePath;
 import hudson.model.AbstractBuild;
+import hudson.model.Item;
 import hudson.model.Run;
+import jenkins.model.Jenkins;
 import org.jenkinsci.plugins.vmanager.charts.VManagerChartsJobProperty;
 
 import java.io.IOException;
@@ -42,6 +44,31 @@ public final class VManagerChartsUtil {
 
     private VManagerChartsUtil() {
         // utility class
+    }
+
+    /**
+     * Enforce that the caller has permission to invoke a descriptor's
+     * {@code doCheckXxx} / {@code doFillXxxItems} method.
+     *
+     * <p>For {@link Item}-scoped descriptors (the model classes in this
+     * plugin live under a job's config page), {@link Item#CONFIGURE} is
+     * the appropriate permission — the same one Jenkins requires to even
+     * open the page on which these endpoints are surfaced. When the
+     * descriptor is invoked outside an item context (e.g. the global
+     * {@code descriptorByName} URL), we fall back to
+     * {@link Jenkins#ADMINISTER}.</p>
+     *
+     * <p>This is paired with {@code @POST} on each endpoint to ensure the
+     * call is CSRF-protected. The method throws
+     * {@link org.springframework.security.access.AccessDeniedException}
+     * when the caller lacks the required permission.</p>
+     */
+    public static void checkDescriptorPermission(Item item) {
+        if (item != null) {
+            item.checkPermission(Item.CONFIGURE);
+        } else {
+            Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+        }
     }
 
     /**

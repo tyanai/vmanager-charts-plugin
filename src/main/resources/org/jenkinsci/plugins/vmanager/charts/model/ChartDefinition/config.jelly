@@ -1,5 +1,6 @@
 ﻿<?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:f="/lib/form">
+    <st:adjunct includes="org.jenkinsci.plugins.vmanager.charts.util.vmpCombo"/>
     <st:adjunct includes="org.jenkinsci.plugins.vmanager.charts.model.ChartDefinition.assets"/>
     <!--
         Lay Chart Title, vPlan Type and vPlan side-by-side on one row.
@@ -16,12 +17,19 @@
         </f:entry>
         <f:entry title="vPlan"
                  field="vPlanPath">
-            <f:combobox fillDependsOn="vPlanType ../serverUrl ../credentialsId"
-                        checkDependsOn="vPlanType ../serverUrl ../credentialsId"/>
+            <!-- Plain textbox; VmpCombo (assets.js) attaches a custom popover
+                 that calls the descriptor's fillVPlanPathItems endpoint
+                 directly. The descriptor URL is exposed via a sibling
+                 hidden input so the JS does not need to know the Jenkins
+                 root URL. -->
+            <f:textbox clazz="vmp-combo-vplan"
+                       checkDependsOn="vPlanType ../serverUrl ../credentialsId"/>
+            <input type="hidden" class="vmp-fill-meta"
+                   data-fill-url="${descriptor.descriptorFullUrl}/fillVPlanPathItems"/>
         </f:entry>
         <f:entry title="Max Builds *"
                  field="maxBuilds">
-            <f:textbox default="50"/>
+            <f:number default="50" min="1" step="1"/>
         </f:entry>
     </div>
     <f:entry title="Metrics"

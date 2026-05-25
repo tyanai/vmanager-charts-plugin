@@ -4,6 +4,7 @@
         Row 1: Chart Title + Chart Sub-title (no help).
         Row 2: Y-axis limit + Max builds + Group-by attribute (all with help).
     -->
+    <st:adjunct includes="org.jenkinsci.plugins.vmanager.charts.util.vmpCombo"/>
     <st:adjunct includes="org.jenkinsci.plugins.vmanager.charts.model.GroupedRunsChartDefinition.assets"/>
     <div class="vmp-chart-row">
         <f:entry title="Chart Title *"
@@ -19,18 +20,23 @@
         <f:entry title="Y-axis limit *"
                  field="yAxisLimit"
                  help="${descriptor.getHelpFile('yAxisLimit')}">
-            <f:textbox default="30"/>
+            <f:number default="30" min="1" step="1"/>
         </f:entry>
         <f:entry title="Max builds *"
                  field="maxBuilds"
                  help="${descriptor.getHelpFile('maxBuilds')}">
-            <f:textbox default="30"/>
+            <f:number default="30" min="1" step="1"/>
         </f:entry>
         <f:entry title="Group-by attribute *"
                  field="groupByAttribute"
                  help="${descriptor.getHelpFile('groupByAttribute')}">
-            <f:combobox fillDependsOn="../serverUrl ../credentialsId"
-                        checkDependsOn="../serverUrl ../credentialsId"/>
+            <!-- Plain textbox; VmpCombo (assets.js) attaches a custom
+                 popover that calls the descriptor's fillGroupByAttributeItems
+                 endpoint directly. -->
+            <f:textbox clazz="vmp-combo-groupby"
+                       checkDependsOn="../serverUrl ../credentialsId"/>
+            <input type="hidden" class="vmp-fill-meta"
+                   data-fill-url="${descriptor.descriptorFullUrl}/fillGroupByAttributeItems"/>
         </f:entry>
         <f:entry title="Statuses"
                  field="statusFilters"
@@ -39,9 +45,16 @@
                  "passed,failed"). assets.js turns it into a multi-select
                  popover dropdown with one checkbox per status from
                  descriptor.allStatuses. An empty value means "include all
-                 statuses" (no status filter applied to the REST payload). -->
+                 statuses" (no status filter applied to the REST payload).
+                 The trigger button is rendered here (not injected by JS) so
+                 that Jenkins' repeatable cloning produces exactly one button
+                 per row; assets.js attaches its handler via Behaviour.specify. -->
             <f:textbox clazz="vmp-status-filters"
                        default=""/>
+            <button type="button"
+                    class="vmp-status-filters-btn">
+                <span>All statuses</span><span style="opacity:0.6;">▾</span>
+            </button>
             <input type="hidden"
                    class="vmp-status-filters-all"
                    value="${descriptor.allStatuses.toString()}"/>

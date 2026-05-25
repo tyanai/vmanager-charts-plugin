@@ -14,11 +14,13 @@ import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
+import org.jenkinsci.plugins.vmanager.charts.util.VManagerChartsUtil;
 import org.jenkinsci.plugins.vmanager.charts.util.VManagerHttpClient;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.verb.POST;
 import hudson.RelativePath;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -198,7 +200,9 @@ public class MetricDefinition extends AbstractDescribableImpl<MetricDefinition> 
             return "Custom Metric";
         }
 
-        public ListBoxModel doFillEntityTypeItems() {
+        @POST
+        public ListBoxModel doFillEntityTypeItems(@AncestorInPath Item item) {
+            VManagerChartsUtil.checkDescriptorPermission(item);
             ListBoxModel m = new ListBoxModel();
             m.add("Session Level",  "SESSION_LEVEL");
             m.add("vPlan Level",    "VPLAN_LEVEL");
@@ -214,6 +218,7 @@ public class MetricDefinition extends AbstractDescribableImpl<MetricDefinition> 
          * field itself and — via {@code checkDependsOn} in the Jelly — whenever
          * {@code entityType}, {@code serverUrl} or {@code credentialsId} change.
          */
+        @POST
         public FormValidation doCheckAttributeName(
                 @QueryParameter String value,
                 @QueryParameter String entityType,
@@ -221,6 +226,7 @@ public class MetricDefinition extends AbstractDescribableImpl<MetricDefinition> 
                 @RelativePath("../..") @QueryParameter String credentialsId,
                 @AncestorInPath Item item) {
 
+            VManagerChartsUtil.checkDescriptorPermission(item);
             if (serverUrl != null && !serverUrl.isBlank()
                     && entityType != null && !entityType.isBlank()) {
                 String url = buildListUrl(serverUrl, entityType);
@@ -246,7 +252,9 @@ public class MetricDefinition extends AbstractDescribableImpl<MetricDefinition> 
             return (m == null || m.isBlank()) ? t.getClass().getSimpleName() : m;
         }
 
-        public ListBoxModel doFillChartTypeItems() {
+        @POST
+        public ListBoxModel doFillChartTypeItems(@AncestorInPath Item item) {
+            VManagerChartsUtil.checkDescriptorPermission(item);
             ListBoxModel m = new ListBoxModel();
             m.add("Line",    "line");
             m.add("Bar",     "bar");
@@ -268,12 +276,14 @@ public class MetricDefinition extends AbstractDescribableImpl<MetricDefinition> 
          *   <li>SESSION_LEVEL: not supported yet — empty list
          * </ul>
          */
+        @POST
         public ComboBoxModel doFillAttributeNameItems(
                 @QueryParameter String entityType,
                 @RelativePath("../..") @QueryParameter String serverUrl,
                 @RelativePath("../..") @QueryParameter String credentialsId,
                 @AncestorInPath Item item) {
 
+            VManagerChartsUtil.checkDescriptorPermission(item);
             ComboBoxModel m = new ComboBoxModel();
 
             if (serverUrl == null || serverUrl.isBlank()

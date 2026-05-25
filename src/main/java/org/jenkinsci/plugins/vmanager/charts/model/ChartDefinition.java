@@ -15,10 +15,12 @@ import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
+import org.jenkinsci.plugins.vmanager.charts.util.VManagerChartsUtil;
 import org.jenkinsci.plugins.vmanager.charts.util.VManagerHttpClient;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.verb.POST;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.ArrayList;
@@ -143,14 +145,20 @@ public class ChartDefinition extends AbstractDescribableImpl<ChartDefinition> {
             return super.newInstance(req, formData);
         }
 
-        public FormValidation doCheckTitle(@QueryParameter String value) {
+        @POST
+        public FormValidation doCheckTitle(@AncestorInPath Item item,
+                                           @QueryParameter String value) {
+            VManagerChartsUtil.checkDescriptorPermission(item);
             if (value == null || value.isBlank()) {
                 return FormValidation.error("Chart title is required.");
             }
             return FormValidation.ok();
         }
 
-        public FormValidation doCheckMaxBuilds(@QueryParameter String value) {
+        @POST
+        public FormValidation doCheckMaxBuilds(@AncestorInPath Item item,
+                                               @QueryParameter String value) {
+            VManagerChartsUtil.checkDescriptorPermission(item);
             if (value == null || value.isBlank()) {
                 return FormValidation.error("Maximum builds is required (use 0 for unlimited).");
             }
@@ -178,6 +186,7 @@ public class ChartDefinition extends AbstractDescribableImpl<ChartDefinition> {
          * via {@code checkDependsOn} in the Jelly when {@code vPlanType},
          * {@code serverUrl} or {@code credentialsId} change.
          */
+        @POST
         public FormValidation doCheckVPlanPath(
                 @QueryParameter String value,
                 @QueryParameter String vPlanType,
@@ -185,6 +194,7 @@ public class ChartDefinition extends AbstractDescribableImpl<ChartDefinition> {
                 @RelativePath("..") @QueryParameter String credentialsId,
                 @AncestorInPath Item item) {
 
+            VManagerChartsUtil.checkDescriptorPermission(item);
             if (!"DB".equals(vPlanType)) {
                 return FormValidation.ok();
             }
@@ -206,7 +216,9 @@ public class ChartDefinition extends AbstractDescribableImpl<ChartDefinition> {
             return FormValidation.ok();
         }
 
-        public ListBoxModel doFillVPlanTypeItems() {
+        @POST
+        public ListBoxModel doFillVPlanTypeItems(@AncestorInPath Item item) {
+            VManagerChartsUtil.checkDescriptorPermission(item);
             ListBoxModel m = new ListBoxModel();
             m.add("-- None --",         "");
             m.add("DB (from server)",    "DB");
@@ -220,6 +232,7 @@ public class ChartDefinition extends AbstractDescribableImpl<ChartDefinition> {
          * For FILE type or when no server details are available: return empty list
          * so the user can type a path freely.
          */
+        @POST
         public ComboBoxModel doFillVPlanPathItems(
                 @QueryParameter String vPlanType,
                 @RelativePath("..")
@@ -228,6 +241,7 @@ public class ChartDefinition extends AbstractDescribableImpl<ChartDefinition> {
                 @QueryParameter String credentialsId,
                 @AncestorInPath Item item) {
 
+            VManagerChartsUtil.checkDescriptorPermission(item);
             ComboBoxModel m = new ComboBoxModel();
 
             if (!"DB".equals(vPlanType)
